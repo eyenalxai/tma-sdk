@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 
 import { parseInitData } from "./init-data"
 import { parseLaunchParams } from "./launch-params"

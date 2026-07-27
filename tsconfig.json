@@ -36,7 +36,7 @@
     "strictPropertyInitialization": true,
     "target": "ES2023",
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo",
-    "types": ["node"],
+    "types": ["node", "bun"],
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*", "*.config.ts"]
