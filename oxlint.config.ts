@@ -165,6 +165,13 @@ const rules: RuleConfig = {
   "react/no-multi-comp": "off",
   "react/hook-use-state": "off",
   "react/forbid-component-props": "off",
+  "react/function-component-definition": [
+    "error",
+    {
+      namedComponents: "arrow-function",
+      unnamedComponents: "arrow-function",
+    },
+  ],
 }
 
 const settings: SettingsConfig = {
