@@ -1,6 +1,6 @@
 {
   "name": "@eyenalxai/tma-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript SDK for Telegram Mini Apps with React bindings and server init-data validation.",
   "keywords": [
     "mini-app",
