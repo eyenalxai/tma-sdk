@@ -42,7 +42,7 @@ const Main = () => {
 }
 ```
 
-`TelegramProvider` creates the session on the client, mounts the viewport, binds Telegram viewport CSS variables, marks the Mini App ready, and destroys the session when unmounted. Initialization failures are thrown to the nearest React error boundary.
+`TelegramProvider` creates the session on the client, mounts the viewport, binds Telegram's viewport and safe-area CSS variables (`--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-safe-area-inset-*`, `--tg-content-safe-area-inset-*`), marks the Mini App ready, and destroys the session when unmounted. Initialization failures are thrown to the nearest React error boundary.
 
 ## Client usage
 
@@ -70,6 +70,16 @@ const parsedLaunchParams = parseLaunchParams(new URLSearchParams(location.search
 ```
 
 `retrieveLaunchParams()` preserves validated Telegram launch parameters in session storage so client-side navigation does not discard the original launch context.
+
+## Desktop platform detection
+
+```ts
+import { isDesktopPlatform, retrieveLaunchParams } from "@eyenalxai/tma-sdk"
+
+isDesktopPlatform(retrieveLaunchParams().tgWebAppPlatform)
+```
+
+`isDesktopPlatform()` returns `true` when the launching client lays out the Mini App without resizing its viewport: `macos`, `tdesktop`, `windows`, `web`, and the legacy `unigram`, `weba`, and `webk` values.
 
 ## Server validation
 

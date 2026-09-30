@@ -1,0 +1,3 @@
+# Standard Telegram CSS variables
+
+The viewport controller binds the CSS custom property names that Telegram documents and `telegram-web-app.js` sets: `--tg-safe-area-inset-{top,bottom,left,right}`, `--tg-content-safe-area-inset-{top,bottom,left,right}`, `--tg-viewport-height`, and `--tg-viewport-stable-height`. This replaces the package-local `--tg-viewport-safe-area-inset-*` and `--tg-viewport-content-safe-area-inset-*` names and drops `--tg-viewport-width`. Consumers must rename the old names in their CSS, but matching the existing CSS ecosystem and the behavior of `telegram-web-app.js` beats a package-local namespace.
