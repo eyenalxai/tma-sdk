@@ -1,5 +1,3 @@
-"use client"
-
 import type { ViewportState } from "@eyenalxai/tma-sdk/lib/viewport"
 
 import { initialViewportState } from "@eyenalxai/tma-sdk/lib/viewport"

@@ -1,5 +1,3 @@
-"use client"
-
 import type { Telegram, TelegramSession } from "@eyenalxai/tma-sdk/lib/telegram"
 import type { PropsWithChildren, ReactNode } from "react"
 

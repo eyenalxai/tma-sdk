@@ -1,5 +1,6 @@
 import { defineConfig } from "tsdown"
 
+// The bundler strips per-module directives, so the built React entry re-declares it.
 const reactClientDirective = ({ fileName }: { fileName: string }) =>
   fileName === "react.js" ? { js: '"use client"' } : undefined
 
