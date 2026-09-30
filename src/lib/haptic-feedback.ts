@@ -1,4 +1,5 @@
 import type { TelegramMethodParams } from "./post-event"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 import { postEventBestEffort } from "./post-event"
 import { supports } from "./version"
@@ -17,8 +18,8 @@ type HapticFeedback = {
   selectionChanged: () => void
 }
 
-const createHapticFeedback = (options: { version: string }): HapticFeedback => {
-  const isSupported = supports("web_app_trigger_haptic_feedback", options.version)
+const createHapticFeedback = (runtime: TelegramRuntime): HapticFeedback => {
+  const isSupported = supports("web_app_trigger_haptic_feedback", runtime.version)
 
   const trigger = (params: HapticFeedbackParams) => {
     if (isSupported) {

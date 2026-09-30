@@ -1,3 +1,5 @@
+import type { TelegramRuntime } from "./telegram-runtime"
+
 import { postEvent, postEventBestEffort } from "./post-event"
 import { supports, supportsParam } from "./version"
 
@@ -7,8 +9,8 @@ type MiniApp = {
   setBgColor: (color: string) => void
 }
 
-const createMiniApp = (options: { version: string }): MiniApp => {
-  const { version } = options
+const createMiniApp = (runtime: TelegramRuntime): MiniApp => {
+  const { version } = runtime
 
   return {
     ready: () => {

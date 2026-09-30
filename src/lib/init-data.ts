@@ -13,7 +13,7 @@ const jsonString = <T extends z.ZodType>(schema: T) =>
     })
     .pipe(schema)
 
-const safeInteger = z.number().int()
+const safeInteger = z.int()
 const integerString = z
   .string()
   .regex(/^-?\d+$/u)

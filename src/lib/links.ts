@@ -1,4 +1,5 @@
 import type { OpenLinkBrowser, TelegramMethodParams } from "./post-event"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 import { postEvent } from "./post-event"
 import { supports, supportsParam } from "./version"
@@ -11,18 +12,18 @@ type OpenLinkOptions = {
 const TELEGRAM_HOSTNAMES = new Set(["t.me", "telegram.me", "telegram.dog"])
 
 const createOpenLink =
-  (options: { version: string }) =>
+  (runtime: TelegramRuntime) =>
   (url: string | URL, linkOptions: OpenLinkOptions = {}): void => {
     const params: TelegramMethodParams["web_app_open_link"] = { url: new URL(url).toString() }
     if (
       linkOptions.tryBrowser !== undefined &&
-      supportsParam("web_app_open_link.try_browser", options.version)
+      supportsParam("web_app_open_link.try_browser", runtime.version)
     ) {
       params.try_browser = linkOptions.tryBrowser
     }
     if (
       linkOptions.tryInstantView !== undefined &&
-      supportsParam("web_app_open_link.try_instant_view", options.version)
+      supportsParam("web_app_open_link.try_instant_view", runtime.version)
     ) {
       params.try_instant_view = linkOptions.tryInstantView
     }
@@ -30,7 +31,7 @@ const createOpenLink =
   }
 
 const createOpenTelegramLink =
-  (options: { version: string }) =>
+  (runtime: TelegramRuntime) =>
   (url: string | URL): void => {
     const parsed = new URL(url)
     if (!TELEGRAM_HOSTNAMES.has(parsed.hostname)) {
@@ -38,7 +39,7 @@ const createOpenTelegramLink =
     }
 
     const path = parsed.pathname + parsed.search
-    if (supports("web_app_open_tg_link", options.version)) {
+    if (supports("web_app_open_tg_link", runtime.version)) {
       postEvent("web_app_open_tg_link", { path_full: path })
       return
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { parseEventPayload } from "./events"
+import { parseEventPayload } from "./event-schemas"
 
 describe("parseEventPayload", () => {
   it("accepts a null back-button payload", () => {
@@ -35,5 +35,34 @@ describe("parseEventPayload", () => {
     expect(parseEventPayload("file_download_requested", '{"status":"downloading"}')).toEqual({
       status: "downloading",
     })
+  })
+
+  it("parses a viewport change event", () => {
+    expect(
+      parseEventPayload("viewport_changed", {
+        height: 640,
+        is_state_stable: true,
+        is_expanded: false,
+      }),
+    ).toEqual({ height: 640, is_state_stable: true, is_expanded: false })
+  })
+
+  it("falls back to window dimensions for a null viewport payload", () => {
+    // MacOS Telegram answers viewport requests with a null payload.
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { innerHeight: 480, innerWidth: 320 },
+    })
+
+    try {
+      expect(parseEventPayload("viewport_changed", null)).toEqual({
+        height: 480,
+        width: 320,
+        is_state_stable: true,
+        is_expanded: true,
+      })
+    } finally {
+      Reflect.deleteProperty(globalThis, "window")
+    }
   })
 })

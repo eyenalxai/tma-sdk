@@ -1,4 +1,6 @@
-import { request } from "./request"
+import type { TelegramRuntime } from "./telegram-runtime"
+
+import { USER_CONFIRMATION_TIMEOUT_MS } from "./request"
 import { supports } from "./version"
 
 type WriteAccessStatus = "allowed" | "cancelled"
@@ -9,15 +11,15 @@ type WriteAccessStatus = "allowed" | "cancelled"
  * @since Mini Apps v6.9
  */
 const createRequestWriteAccess =
-  (options: { version: string; signal: AbortSignal }) => async (): Promise<WriteAccessStatus> => {
-    if (!supports("web_app_request_write_access", options.version)) {
+  (runtime: TelegramRuntime) => async (): Promise<WriteAccessStatus> => {
+    if (!supports("web_app_request_write_access", runtime.version)) {
       throw new Error("Write access requests are not supported in this Telegram version")
     }
 
-    const { payload } = await request({
+    const { payload } = await runtime.request({
       method: ["web_app_request_write_access"],
       events: ["write_access_requested"],
-      signal: options.signal,
+      timeout: USER_CONFIRMATION_TIMEOUT_MS,
     })
 
     return payload.status

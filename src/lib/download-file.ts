@@ -1,4 +1,6 @@
-import { request } from "./request"
+import type { TelegramRuntime } from "./telegram-runtime"
+
+import { USER_CONFIRMATION_TIMEOUT_MS } from "./request"
 import { supports } from "./version"
 
 /**
@@ -6,16 +8,16 @@ import { supports } from "./version"
  * @since Mini Apps v8.0
  */
 const createDownloadFile =
-  (options: { version: string; signal: AbortSignal }) =>
+  (runtime: TelegramRuntime) =>
   async (url: string, fileName: string): Promise<void> => {
-    if (!supports("web_app_request_file_download", options.version)) {
+    if (!supports("web_app_request_file_download", runtime.version)) {
       throw new Error("File download is not supported in this Telegram version")
     }
 
-    const { payload } = await request({
+    const { payload } = await runtime.request({
       method: ["web_app_request_file_download", { url, file_name: fileName }],
       events: ["file_download_requested"],
-      signal: options.signal,
+      timeout: USER_CONFIRMATION_TIMEOUT_MS,
     })
 
     if (payload.status !== "downloading") {

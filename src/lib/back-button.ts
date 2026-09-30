@@ -1,6 +1,6 @@
 import type { Store } from "./store"
+import type { TelegramRuntime } from "./telegram-runtime"
 
-import { on } from "./events"
 import { postEventBestEffort } from "./post-event"
 import { createStore } from "./store"
 import { supports } from "./version"
@@ -17,8 +17,8 @@ type BackButton = {
   onClick: (listener: () => void) => () => void
 }
 
-const createBackButton = (options: { version: string }): BackButton => {
-  const isSupported = supports("web_app_setup_back_button", options.version)
+const createBackButton = (runtime: TelegramRuntime): BackButton => {
+  const isSupported = supports("web_app_setup_back_button", runtime.version)
   const store = createStore<BackButtonState>({ isVisible: false })
 
   const setVisible = (isVisible: boolean) => {
@@ -39,7 +39,7 @@ const createBackButton = (options: { version: string }): BackButton => {
     hide: () => {
       setVisible(false)
     },
-    onClick: (listener) => on("back_button_pressed", listener),
+    onClick: (listener) => runtime.hub.on("back_button_pressed", listener),
   }
 }
 
