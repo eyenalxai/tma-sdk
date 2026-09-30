@@ -48,7 +48,7 @@ describe("parseEventPayload", () => {
   })
 
   it("falls back to window dimensions for a null viewport payload", () => {
-    // MacOS Telegram answers viewport requests with a null payload.
+    // Telegram for macOS sends a null viewport payload.
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: { innerHeight: 480, innerWidth: 320 },

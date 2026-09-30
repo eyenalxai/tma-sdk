@@ -40,7 +40,7 @@ const eventSchemas = {
   reload_iframe: payloadlessEventSchema,
   safe_area_changed: safeAreaInsetsSchema,
   set_custom_style: z.string(),
-  // MacOS Telegram has a bug sending a null payload; fall back to window dimensions.
+  // Telegram for macOS sends a null payload; fall back to window dimensions.
   viewport_changed: viewportChangedEventSchema,
   write_access_requested: z.looseObject({ status: z.enum(["allowed", "cancelled"]) }),
 }
