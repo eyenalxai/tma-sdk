@@ -129,6 +129,10 @@ const restoreProperty = (
   }
 }
 
+const receiveEvent = (eventType: string, eventData?: unknown): void => {
+  dispatch(eventType, eventData)
+}
+
 /** Installs a global `receiveEvent` entry point used by native Telegram clients. */
 const installReceiveEvent = (
   owner: Record<PropertyKey, unknown>,
@@ -136,9 +140,6 @@ const installReceiveEvent = (
   registerCleanup: RegisterCleanup,
 ): void => {
   const previousDescriptor = Object.getOwnPropertyDescriptor(owner, key)
-  const receiveEvent = (eventType: string, eventData?: unknown) => {
-    dispatch(eventType, eventData)
-  }
   owner[key] = receiveEvent
 
   registerCleanup(() => {

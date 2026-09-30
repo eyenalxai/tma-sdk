@@ -87,7 +87,7 @@ Keep the bot token server-side. Never expose it to Mini App client code.
 
 ## Requirements
 
-- Node.js 20.19.0 or newer for the `/server` entry point.
+- Node.js `^22.18.0`, `^24.11.0`, or `>=26.0.0` for the `/server` entry point.
 - React 19 or newer for the `/react` entry point.
 - A browser environment launched inside Telegram for Mini App session APIs.
 - ESM-compatible module resolution.

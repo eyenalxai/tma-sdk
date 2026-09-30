@@ -124,6 +124,7 @@ const rules: RuleConfig = {
   "no-empty-function": "error",
   "unicorn/no-useless-collection-argument": "error",
   "unicorn/prefer-ternary": "error",
+  "one-var": ["error", "never"], // Keeps oxfmt's one declaration per statement style; "always" would force unreadable comma chains.
   "no-negated-condition": "error",
   "typescript/array-type": "error",
   "typescript/unified-signatures": "error",
@@ -149,7 +150,6 @@ const rules: RuleConfig = {
   "import/no-default-export": "error",
   "typescript/parameter-properties": "error",
   "unicorn/custom-error-definition": "error",
-  "react/react-compiler": "error",
   "react/jsx-no-literals": "off",
   "react/react-in-jsx-scope": "off",
   "react/jsx-filename-extension": "off",
@@ -176,7 +176,7 @@ const rules: RuleConfig = {
 
 const settings: SettingsConfig = {
   react: {
-    version: "19.2.7",
+    version: "19.3.0",
   },
   "react-doctor": {
     forbidComponentProps: {

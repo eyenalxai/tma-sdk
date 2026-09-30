@@ -2,7 +2,7 @@
 
 ## Development
 
-Requires Node.js >= 20.19.0 and Bun 1.3.11 (the `packageManager` field is authoritative).
+Requires Node.js ^22.18.0 || ^24.11.0 || >=26.0.0 and Bun 1.4.2 (the `packageManager` field is authoritative).
 
 ```sh
 bun install
