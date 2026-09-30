@@ -1,7 +1,8 @@
-import type { ViewportState } from "@eyenalxai/tma-sdk/lib/viewport"
-
-import { initialViewportState } from "@eyenalxai/tma-sdk/lib/viewport"
 import { useSyncExternalStore } from "react"
+
+import type { ViewportState } from "#lib/viewport"
+
+import { initialViewportState } from "#lib/viewport"
 
 import { useTelegram } from "./use-telegram"
 

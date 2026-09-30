@@ -1,6 +1,6 @@
-import type { Telegram } from "@eyenalxai/tma-sdk/lib/telegram"
-
 import { createContext, use } from "react"
+
+import type { Telegram } from "#lib/telegram"
 
 const TelegramContext = createContext<Telegram | null>(null)
 

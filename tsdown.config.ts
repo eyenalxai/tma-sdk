@@ -14,15 +14,8 @@ export default defineConfig({
   minify: false,
   clean: true,
   banner: reactClientDirective,
-  alias: {
-    // Mirrors the tsconfig path alias so internal absolute imports are bundled.
-    "@eyenalxai/tma-sdk": "./src",
-  },
   deps: {
     neverBundle: true,
-    // The package's own tsconfig path alias (`@eyenalxai/tma-sdk/*` -> `./src/*`)
-    // must be inlined; everything else stays external.
-    alwaysBundle: [/^@eyenalxai\/tma-sdk\//],
   },
   attw: {
     enabled: "ci-only",

@@ -1,7 +1,8 @@
-import type { InitData } from "@eyenalxai/tma-sdk/lib/init-data"
-
-import { parseInitData } from "@eyenalxai/tma-sdk/lib/init-data"
 import { createHmac, timingSafeEqual } from "node:crypto"
+
+import type { InitData } from "#lib/init-data"
+
+import { parseInitData } from "#lib/init-data"
 
 type ValidateInitDataOptions = {
   /**

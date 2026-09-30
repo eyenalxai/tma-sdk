@@ -1,9 +1,11 @@
-import type { Telegram, TelegramSession } from "@eyenalxai/tma-sdk/lib/telegram"
 import type { PropsWithChildren, ReactNode } from "react"
 
-import { TelegramContext } from "@eyenalxai/tma-sdk/hooks/use-telegram"
-import { createTelegramSession } from "@eyenalxai/tma-sdk/lib/telegram"
 import { useEffect, useState } from "react"
+
+import type { Telegram, TelegramSession } from "#lib/telegram"
+
+import { TelegramContext } from "#hooks/use-telegram"
+import { createTelegramSession } from "#lib/telegram"
 
 type TelegramProviderProps = PropsWithChildren<{
   /**
