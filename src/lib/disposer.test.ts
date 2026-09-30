@@ -54,4 +54,30 @@ describe("createDisposer", () => {
     }).toThrow("Cannot add a cleanup to a disposed disposer")
     expect(calls).toBe(0)
   })
+
+  it("runs the remaining cleanups when one fails", () => {
+    const calls: string[] = []
+    const failure = new Error("cleanup failed")
+    const disposer = createDisposer()
+    disposer.add(() => {
+      calls.push("first")
+    })
+    disposer.add(() => {
+      throw failure
+    })
+    disposer.add(() => {
+      calls.push("last")
+    })
+
+    let caught: unknown = null
+    try {
+      disposer.dispose()
+    } catch (error) {
+      caught = error
+    }
+
+    expect(calls).toEqual(["last", "first"])
+    expect(caught).toBeInstanceOf(AggregateError)
+    expect(caught instanceof AggregateError ? caught.errors : null).toEqual([failure])
+  })
 })

@@ -102,6 +102,10 @@ const createViewport = (
       }
     }
 
+    if (runtime.disposer.isDisposed) {
+      return
+    }
+
     // Best-effort: Web K and Unigram never answer these requests. Mount must not stall on them.
     // Telegram for macOS answers the content safe-area request with `safe_area_changed` instead.
     if (supports("web_app_request_safe_area", version)) {

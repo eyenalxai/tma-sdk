@@ -18,8 +18,24 @@ type EventHandlerSets = {
   [Event in TelegramEventName]: Set<EventHandler<Event>>
 }
 
+type EventPayloadParseResult =
+  | { success: true; payload: TelegramEventPayloads[TelegramEventName] }
+  | { success: false }
+
 const isTelegramEventName = (value: string): value is TelegramEventName =>
   Object.hasOwn(eventSchemas, value)
+
+const parseEventPayloadOrLog = (
+  eventType: TelegramEventName,
+  eventData: unknown,
+): EventPayloadParseResult => {
+  try {
+    return { success: true, payload: parseEventPayload(eventType, eventData) }
+  } catch (error) {
+    console.error(`[Telegram] Failed to parse "${eventType}" event payload`, eventData, error)
+    return { success: false }
+  }
+}
 
 const createEventHub = (
   subscribe: (sink: TelegramEventSink) => () => void = subscribeToTelegramEvents,
@@ -55,10 +71,9 @@ const createEventHub = (
       return
     }
 
-    try {
-      deliverEvent(eventType, parseEventPayload(eventType, eventData))
-    } catch (error) {
-      console.error(`[Telegram] Failed to parse "${eventType}" event payload`, eventData, error)
+    const parseResult = parseEventPayloadOrLog(eventType, eventData)
+    if (parseResult.success) {
+      deliverEvent(eventType, parseResult.payload)
     }
   }
 

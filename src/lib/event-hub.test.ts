@@ -137,4 +137,25 @@ describe("createEventHub", () => {
     ).toThrow("Cannot subscribe to a destroyed event hub")
     expect(received).toEqual([])
   })
+
+  it("propagates handler errors without logging them as parse failures", () => {
+    const bridge = createTestBridge()
+    const hub = createEventHub(bridge.subscribe)
+    const consoleError = silentConsoleError()
+    const failure = new Error("handler failed")
+    let caught: unknown = null
+    hub.on("back_button_pressed", () => {
+      throw failure
+    })
+
+    try {
+      bridge.emit("back_button_pressed", null)
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBe(failure)
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
 })

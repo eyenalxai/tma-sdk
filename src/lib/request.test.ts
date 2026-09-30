@@ -35,7 +35,7 @@ const createHarness = (options: HarnessOptions = {}) => {
     defaultTimeout: options.defaultTimeout,
   })
 
-  return { emit, postEvent, request }
+  return { emit, hub, postEvent, request }
 }
 
 const catchFailure = async (promise: Promise<unknown>): Promise<unknown> => {
@@ -214,5 +214,17 @@ describe("createRequest", () => {
 
     expect(consoleError).not.toHaveBeenCalled()
     consoleError.mockRestore()
+  })
+
+  it("releases its timeout when subscribing to the hub fails", async () => {
+    const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
+    const { hub, request } = createHarness()
+    hub.destroy()
+
+    expect(await catchFailure(request(viewportRequest))).toMatchObject({
+      message: "Cannot subscribe to a destroyed event hub",
+    })
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+    clearTimeoutSpy.mockRestore()
   })
 })

@@ -20,8 +20,18 @@ const createDisposer = (): Disposer => {
         return
       }
       isDisposed = true
+
+      const errors: unknown[] = []
       for (const cleanup of cleanups.splice(0).toReversed()) {
-        cleanup()
+        try {
+          cleanup()
+        } catch (error) {
+          errors.push(error)
+        }
+      }
+
+      if (errors.length > 0) {
+        throw new AggregateError(errors, "Cleanup failed")
       }
     },
     get isDisposed() {

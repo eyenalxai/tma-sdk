@@ -94,14 +94,25 @@ const createRequest = (options: CreateRequestOptions): Request => {
         signal?.removeEventListener("abort", abortListener)
       })
 
-      for (const event of events) {
-        disposer.add(
-          hub.on(event, (payload) => {
-            settle(() => {
-              resolve({ event, payload } as RequestResult<E>)
-            })
-          }),
-        )
+      try {
+        for (const event of events) {
+          disposer.add(
+            hub.on(event, (payload) => {
+              settle(() => {
+                resolve({ event, payload } as RequestResult<E>)
+              })
+            }),
+          )
+        }
+      } catch (error) {
+        settle(() => {
+          reject(
+            error instanceof Error
+              ? error
+              : new Error("Unable to subscribe to Telegram events", { cause: error }),
+          )
+        })
+        return
       }
 
       if (signal?.aborted === true) {
