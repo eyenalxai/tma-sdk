@@ -12,13 +12,13 @@ not live there.
 - **List issues**: `rata issue list` with the filters you need. Useful filters:
   `--team`, `--state`, `--state-type`, `--label`, `--assignee`, `--parent`,
   `--text`, `--limit`.
-- **Comment on an issue**: `rata issue comment <ref> --body-file -`
+- **Comment on an issue**: `rata issue comment create <ref> --body-file -`
 - **Apply / remove labels**: `rata issue label add <ref> <label...>` and
   `rata issue label remove <ref> <label...>`
 - **Close**: `rata issue close <ref> --comment "..."`
 - **Search**: `rata search "..."`
 - **Set a priority**: `rata issue update <ref> --priority <value>`. See **Priorities**.
-- **Assign**: `rata issue assign me <ref>`. See **Assignment**.
+- **Assign**: `rata issue assign <ref> --assignee me`. See **Assignment**.
 
 An issue reference accepts an identifier (`TMA-42`), a UUID, or a linear.app
 issue URL.
@@ -94,7 +94,8 @@ with **child** issues as tickets.
   when every issue that blocks it is closed.
 - **Frontier query**: `rata issue list --parent <map-ref> --unblocked --unassigned --json`.
   The first result in map order wins.
-- **Claim**: `rata issue assign me <ref>`, the session's first write.
-- **Resolve**: `rata issue comment <ref> --body-file -`, then
+- **Claim**: `rata issue assign <ref> --assignee me`, the session's first write.
+- **Resolve**: `rata issue comment create <ref> --body-file -`, then
   `rata issue close <ref>`, then append a context pointer to the map's
-  Decisions-so-far with `rata issue update <map-ref> --body-file -`.
+  Decisions-so-far with
+  `rata issue section append <map-ref> "Decisions so far" --body-file -`.

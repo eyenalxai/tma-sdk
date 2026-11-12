@@ -19,7 +19,7 @@ Issues live in Linear (team TMA), driven with the `rata` CLI. Every issue carrie
 
 ### Triage labels
 
-The five canonical triage roles use their default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+The category labels are `Bug` (workspace-level) and `enhancement`. The five state roles use their default strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), and closed issues carry a close-reason label. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 

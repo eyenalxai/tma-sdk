@@ -14,7 +14,7 @@ This is one package with one context: the Mini App SDK itself.
 - **`GLOSSARY.md`** at the repo root.
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `domain-modeling` skill (reached via `grill-with-docs`, `mission`, and `improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
 ## Use the glossary's vocabulary
 
