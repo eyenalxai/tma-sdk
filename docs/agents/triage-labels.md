@@ -5,7 +5,7 @@ to the actual label strings used in this repo's issue tracker.
 
 ## State roles
 
-| Label in mattpocock/skills | Label in our tracker | Meaning                                  |
+| Canonical role             | Label in our tracker | Meaning                                  |
 | -------------------------- | -------------------- | ---------------------------------------- |
 | `needs-triage`             | `needs-triage`       | Maintainer needs to evaluate this issue  |
 | `needs-info`               | `needs-info`         | Waiting on reporter for more information |
@@ -17,6 +17,10 @@ to the actual label strings used in this repo's issue tracker.
 
 `Bug` (workspace-level, shared with team FND) and `enhancement` (team TMA).
 A live, triaged issue carries exactly one category role and one state role.
+
+`Bug` is a workspace label, not a team label, so `rata label list --team TMA`
+does not list it. It still applies to TMA issues; filter with
+`rata issue list --label Bug`.
 
 ## Close reasons
 
