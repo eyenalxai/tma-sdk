@@ -177,7 +177,7 @@ const rules: RuleConfig = {
 
 const settings: SettingsConfig = {
   react: {
-    version: "19.3.1",
+    version: "19.3.0",
   },
   "react-doctor": {
     forbidComponentProps: {
