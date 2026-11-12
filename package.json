@@ -73,21 +73,21 @@
     "version-packages": "changeset version"
   },
   "dependencies": {
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@changesets/cli": "3.0.3",
-    "@types/bun": "1.4.2",
-    "@types/node": "26.6.3",
+    "@types/bun": "1.4.4",
+    "@types/node": "26.6.6",
     "@types/react": "19.3.0",
-    "oxfmt": "0.70.0",
-    "oxlint": "1.85.0",
-    "oxlint-plugin-react-doctor": "0.9.14",
-    "oxlint-tsgolint": "7.0.2003",
-    "publint": "0.3.24",
-    "react": "19.3.0",
-    "tsdown": "0.23.0",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "oxlint-plugin-react-doctor": "0.9.22",
+    "oxlint-tsgolint": "7.0.2006",
+    "publint": "0.3.25",
+    "react": "19.3.1",
+    "tsdown": "0.23.7",
     "typescript": "7.0.2"
   },
   "peerDependencies": {
@@ -101,5 +101,5 @@
   "engines": {
     "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.4"
 }

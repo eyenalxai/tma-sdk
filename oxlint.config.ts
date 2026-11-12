@@ -112,6 +112,7 @@ const rules: RuleConfig = {
   "require-await": "off", // This rule is inferior to the accuracy of the type-aware typescript/require-await rule.
   "no-plusplus": "error",
   "init-declarations": "error",
+  "unicorn/no-useless-undefined": "off", // Conflicts with init-declarations, which requires the initializer.
   "sort-keys": "off", // Breaks TanStack Query mutation context inference by reordering callbacks.
   "oxc/erasing-op": "error",
   "no-nested-ternary": "off",
