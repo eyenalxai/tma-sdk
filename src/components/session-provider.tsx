@@ -20,8 +20,8 @@ type SessionProviderProps = PropsWithChildren<{
   onError?: (error: Error) => void
   /**
    * Mark the Mini App ready as soon as the session starts.
-   * Set to `false` to call `markReady()` yourself.
-   * @default true
+   * Leave it `false` to call `markReady()` yourself.
+   * @default false
    */
   autoReady?: boolean
   /**
@@ -43,7 +43,7 @@ const SessionProvider = ({
   children,
   fallback = null,
   onError,
-  autoReady = true,
+  autoReady = false,
   expand = false,
   disableVerticalSwipes = false,
 }: SessionProviderProps): ReactNode => {
@@ -51,6 +51,7 @@ const SessionProvider = ({
   const [error, setError] = useState<Error | null>(null)
   const onErrorRef = useRef(onError)
   const autoReadyRef = useRef(autoReady)
+  const verticalSwipesDisabledRef = useRef(false)
 
   useEffect(() => {
     onErrorRef.current = onError
@@ -95,7 +96,14 @@ const SessionProvider = ({
 
     return () => {
       active = false
-      current?.destroy()
+      if (current !== null) {
+        // Restore swipes first: after destroy the protocol cannot send this method.
+        if (verticalSwipesDisabledRef.current && current.status.get() !== "closed") {
+          current.features.swipeBehavior.enableVertical()
+        }
+        verticalSwipesDisabledRef.current = false
+        current.destroy()
+      }
     }
   }, [])
 
@@ -112,10 +120,12 @@ const SessionProvider = ({
 
     const { swipeBehavior } = session.features
     swipeBehavior.disableVertical()
+    verticalSwipesDisabledRef.current = true
     return () => {
       if (session.status.get() !== "closed") {
         swipeBehavior.enableVertical()
       }
+      verticalSwipesDisabledRef.current = false
     }
   }, [disableVerticalSwipes, session])
 

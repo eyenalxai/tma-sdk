@@ -28,6 +28,7 @@ The root entry is safe to import during server rendering, but functions such as 
 
 ```tsx
 import { SessionProvider, useSession } from "@eyenalxai/tma-sdk/react"
+import { useEffect } from "react"
 
 const App = () => (
   <SessionProvider fallback={null}>
@@ -38,13 +39,17 @@ const App = () => (
 const Main = () => {
   const session = useSession()
 
+  useEffect(() => {
+    session.markReady()
+  }, [session])
+
   return <div>User: {session.initData?.user?.first_name ?? "Unknown"}</div>
 }
 ```
 
-`SessionProvider` creates the session on the client, mounts the viewport, binds Telegram's viewport and safe-area CSS variables (`--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-safe-area-inset-*`, `--tg-content-safe-area-inset-*`), marks the Mini App ready, and destroys the session when unmounted. It renders `fallback` until the session starts.
+`SessionProvider` creates the session on the client, mounts the viewport, binds Telegram's viewport and safe-area CSS variables (`--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-safe-area-inset-*`, `--tg-content-safe-area-inset-*`), and destroys the session when unmounted. It renders `fallback` until the session starts.
 
-Set `autoReady={false}` to call `markReady()` yourself. Pass `onError` to receive initialization failures instead of throwing to the nearest React error boundary. `expand` and `disableVerticalSwipes` default to `false`, so the provider does not change native behavior unless asked.
+The provider leaves readiness to the app by default. Call `session.markReady()` when your first screen is ready, or set `autoReady` to mark the Mini App ready as soon as `start()` resolves. Pass `onError` to receive initialization failures instead of throwing to the nearest React error boundary. `expand` and `disableVerticalSwipes` default to `false`, so the provider does not change native behavior unless asked.
 
 ## Client usage
 
@@ -61,7 +66,9 @@ session.features.viewport.expand()
 session.destroy()
 ```
 
-`createSession()` returns synchronously and installs the Telegram event bridge before any await. Init data is nullable because some launches have none; call `session.requireInitData()` when the app cannot work without it. Stateful events (viewport, fullscreen, safe area, theme and visibility) keep their last payload and replay it to a late subscriber, so state that arrives before React renders is not lost.
+`createSession()` returns synchronously and installs the Telegram event bridge before any await. Init data is nullable because some launches have none; call `session.requireInitData()` when the app cannot work without it. A passive bridge captures viewport, fullscreen, safe-area, theme and visibility events from module import, so an event that arrives before `createSession()` is delivered to the first subscriber. Stateful events then keep their last payload and replay it to a later subscriber.
+
+The read-only session status moves from `launched` to `mounted` and then `ready`, and ends at `closed` after `destroy()`. A failed start leaves it at `failed` until `destroy()`; `markReady()` only takes effect after mount.
 
 ## Launch parameters and init data
 

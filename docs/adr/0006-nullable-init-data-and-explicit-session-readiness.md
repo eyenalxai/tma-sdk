@@ -1,0 +1,5 @@
+# Nullable init data and explicit session readiness
+
+A launch without signed init data is still a usable Mini App: the session exposes `initData` as `InitData | null` and `requireInitData()` throws only when the app actually needs the user identity. `createSession()` no longer rejects a launch just because the launch parameters carry no `tgWebAppData`. The trade-off is that callers must make the requirement explicit at the point of use instead of receiving an early failure.
+
+Readiness is also explicit. `start()` owns mounting and the initial state requests, while `markReady()` is the app's decision that the first screen is usable. The session status is read-only, moves `launched` → `mounted` → `ready` → `closed`, and a failed start stays `failed` until `destroy()`. `markReady()` only works from `mounted`, so a ready call before mount or after a failure cannot hide a placeholder over a broken session. The React provider therefore defaults `autoReady` to `false`; apps opt in when they want the provider to mark ready as soon as `start()` resolves.

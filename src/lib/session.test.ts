@@ -7,6 +7,7 @@ import type { ProtocolWindow } from "#lib/protocol/transport"
 import { isRecord } from "#lib/is-record"
 
 import { createSession } from "./session"
+import { installEarlyEventCapture } from "./session/replay"
 
 type NativePost = { eventType: string; eventData: string }
 
@@ -63,7 +64,44 @@ const installFakeWindow = (search = ""): TestEnvironment => {
   }
 }
 
+/**
+ * A document without a document element lets the session be constructed but
+ * makes the CSS-variable binding fail during start, without touching features.
+ */
+const installDocumentWithoutRoot = (): (() => void) => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "document")
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    writable: true,
+    value: {
+      createElement: () => {
+        return { id: "", innerHTML: "", remove: () => undefined }
+      },
+      head: { append: () => undefined },
+    },
+  })
+
+  return () => {
+    if (descriptor === undefined) {
+      Reflect.deleteProperty(globalThis, "document")
+    } else {
+      Object.defineProperty(globalThis, "document", descriptor)
+    }
+  }
+}
+
 const launchWithoutInitData = "?tgWebAppPlatform=ios&tgWebAppVersion=9.6"
+const desktopLaunchWithoutInitData = "?tgWebAppPlatform=web&tgWebAppVersion=9.6"
+
+const viewportPayload = {
+  height: 640,
+  width: 320,
+  is_state_stable: true,
+  is_expanded: false,
+}
+
+const countPosts = (posts: NativePost[], eventType: string): number =>
+  posts.filter((post) => post.eventType === eventType).length
 
 const flushMicrotasks = async (): Promise<void> => {
   await Promise.resolve()
@@ -87,6 +125,8 @@ describe("createSession", () => {
       expect(session.launch.tgWebAppPlatform).toBe("ios")
       expect(session.initData).toBeNull()
       expect(session.status.get()).toBe("launched")
+      expect("set" in session.status).toBe(false)
+      expect("update" in session.status).toBe(false)
       expect(() => session.requireInitData()).toThrow("init data")
       session.destroy()
     } finally {
@@ -129,7 +169,7 @@ describe("createSession", () => {
     }
   })
 
-  it("replays every stateful event", () => {
+  it("replays the last stateful payload to a late subscriber", () => {
     const cases: { event: EventName; payload: EventPayloads[EventName] }[] = [
       {
         event: "viewport_changed",
@@ -179,32 +219,6 @@ describe("createSession", () => {
     }
   })
 
-  it("replays the last stateful payload to a late subscriber", () => {
-    const environment = installFakeWindow(launchWithoutInitData)
-    try {
-      const session = createSession()
-      environment.emit("viewport_changed", {
-        height: 640,
-        width: 320,
-        is_state_stable: true,
-        is_expanded: false,
-      })
-      const received: unknown[] = []
-      const unsubscribe = session.protocol.on("viewport_changed", (payload) => {
-        received.push(payload)
-      })
-
-      expect(received).toEqual([
-        { height: 640, width: 320, is_state_stable: true, is_expanded: false },
-      ])
-
-      unsubscribe()
-      session.destroy()
-    } finally {
-      environment.restore()
-    }
-  })
-
   it("does not replay stateful events that never arrived", () => {
     const environment = installFakeWindow(launchWithoutInitData)
     try {
@@ -215,6 +229,32 @@ describe("createSession", () => {
       })
 
       expect(received).toEqual([])
+      session.destroy()
+    } finally {
+      environment.restore()
+    }
+  })
+
+  it("delivers an event that arrived before createSession to the first subscriber", async () => {
+    const environment = installFakeWindow(desktopLaunchWithoutInitData)
+    try {
+      installEarlyEventCapture(environment.fakeWindow)
+      environment.emit("viewport_changed", viewportPayload)
+
+      const session = createSession()
+      const received: unknown[] = []
+      session.protocol.on("viewport_changed", (payload) => {
+        received.push(payload)
+      })
+
+      expect(received).toEqual([viewportPayload])
+
+      await session.start()
+      expect(session.initData).toBeNull()
+      expect(session.features.viewport.store.get()).toMatchObject({
+        height: 640,
+        width: 320,
+      })
       session.destroy()
     } finally {
       environment.restore()
@@ -269,18 +309,73 @@ describe("createSession", () => {
       })
       await started
 
-      expect(
-        environment.posts.filter((post) => post.eventType === "web_app_request_viewport"),
-      ).toHaveLength(1)
+      expect(countPosts(environment.posts, "web_app_request_viewport")).toBe(1)
       expect(session.status.get()).toBe("mounted")
 
       session.markReady()
       session.markReady()
 
       expect(session.status.get()).toBe("ready")
-      expect(environment.posts.filter((post) => post.eventType === "web_app_ready")).toHaveLength(1)
+      expect(countPosts(environment.posts, "web_app_ready")).toBe(1)
       session.destroy()
     } finally {
+      environment.restore()
+    }
+  })
+
+  it("does not mark ready before the session is mounted", async () => {
+    const environment = installFakeWindow(launchWithoutInitData)
+    try {
+      const session = createSession()
+      session.markReady()
+
+      expect(session.status.get()).toBe("launched")
+      expect(countPosts(environment.posts, "web_app_ready")).toBe(0)
+
+      const started = session.start()
+      await flushMicrotasks()
+      environment.emit("viewport_changed", {
+        height: 640,
+        is_state_stable: true,
+        is_expanded: true,
+      })
+      await started
+
+      expect(session.status.get()).toBe("mounted")
+      expect(countPosts(environment.posts, "web_app_ready")).toBe(0)
+
+      session.markReady()
+
+      expect(session.status.get()).toBe("ready")
+      expect(countPosts(environment.posts, "web_app_ready")).toBe(1)
+      session.destroy()
+    } finally {
+      environment.restore()
+    }
+  })
+
+  it("keeps a failed session failed until destroy", async () => {
+    const environment = installFakeWindow(desktopLaunchWithoutInitData)
+    const restoreDocument = installDocumentWithoutRoot()
+    try {
+      const session = createSession()
+
+      const startFailure = await catchFailure(session.start())
+      expect(startFailure).toBeInstanceOf(Error)
+      expect(session.status.get()).toBe("failed")
+
+      session.markReady()
+      expect(session.status.get()).toBe("failed")
+      expect(countPosts(environment.posts, "web_app_ready")).toBe(0)
+
+      const retryFailure = await catchFailure(session.start())
+      expect(retryFailure instanceof Error ? retryFailure.message : "").toContain("failed")
+      expect(session.status.get()).toBe("failed")
+
+      session.destroy()
+      expect(session.status.get()).toBe("closed")
+    } finally {
+      restoreDocument()
       environment.restore()
     }
   })
@@ -298,50 +393,6 @@ describe("createSession", () => {
       expect(closedFailure).toBeInstanceOf(Error)
       expect(closedFailure instanceof Error ? closedFailure.message : "").toContain("closed")
       expect(() => session.protocol.on("viewport_changed", () => undefined)).toThrow("destroyed")
-    } finally {
-      environment.restore()
-    }
-  })
-
-  it("marks the session failed when mounting fails", async () => {
-    const environment = installFakeWindow(launchWithoutInitData)
-    try {
-      const session = createSession()
-      session.features.viewport.mount = async () => {
-        await Promise.reject(new Error("mount failed"))
-      }
-
-      const mountFailure = await catchFailure(session.start())
-      expect(mountFailure).toBeInstanceOf(Error)
-      expect(mountFailure instanceof Error ? mountFailure.message : "").toContain("mount failed")
-
-      expect(session.status.get()).toBe("failed")
-      session.destroy()
-    } finally {
-      environment.restore()
-    }
-  })
-
-  it("delivers an early viewport event to a session that starts with empty init data", async () => {
-    const environment = installFakeWindow("?tgWebAppPlatform=web&tgWebAppVersion=9.6")
-    try {
-      const session = createSession()
-      environment.emit("viewport_changed", {
-        height: 640,
-        width: 320,
-        is_state_stable: true,
-        is_expanded: true,
-      })
-
-      await session.start()
-
-      expect(session.initData).toBeNull()
-      expect(session.features.viewport.store.get()).toMatchObject({
-        height: 640,
-        width: 320,
-        isExpanded: true,
-      })
-      session.destroy()
     } finally {
       environment.restore()
     }

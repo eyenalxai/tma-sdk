@@ -24,6 +24,10 @@ _Avoid_: login validation, token validation
 The client-side lifecycle that owns Telegram launch data, client event subscriptions, feature controllers, and teardown.
 _Avoid_: Telegram context, SDK instance
 
+**Session status**:
+The read-only lifecycle state of a Mini App session: `launched` before `start()`, `mounted` after the viewport mounts, `ready` after `markReady()`, `failed` when start fails, and `closed` after `destroy()`. `failed` is terminal until destroy.
+_Avoid_: session state, lifecycle phase
+
 **Telegram event bridge**:
 The client-side communication layer connecting the Mini App to Telegram's event transport for web or native clients.
 _Avoid_: event bus, WebView bridge

@@ -72,6 +72,14 @@ const render = async (element: ReactElement): Promise<HTMLElement> => {
   return container
 }
 
+const unmountAll = async (): Promise<void> => {
+  await actAsync(() => {
+    for (const root of roots.splice(0)) {
+      root.unmount()
+    }
+  })
+}
+
 const emit = (eventType: string, eventData?: unknown): void => {
   const receive: unknown = Reflect.get(window, "TelegramGameProxy_receiveEvent")
   if (typeof receive === "function") {
@@ -87,7 +95,19 @@ const emitInAct = async (eventType: string, eventData?: unknown): Promise<void> 
 
 const postedEvents = (): string[] => posts.map((post) => post.eventType)
 
+const swipeStates = (): boolean[] =>
+  posts
+    .filter((post) => post.eventType === "web_app_setup_swipe_behavior")
+    .map((post) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      const payload = JSON.parse(post.eventData) as { allow_vertical_swipe: boolean }
+      return payload.allow_vertical_swipe
+    })
+
+let actEnvironmentDescriptor: PropertyDescriptor | undefined = undefined
+
 beforeAll(async () => {
+  actEnvironmentDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IS_REACT_ACT_ENVIRONMENT")
   GlobalRegistrator.register({ url: "https://app.example/" })
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true)
   // Registering globals must happen before React DOM reads the document.
@@ -97,6 +117,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await GlobalRegistrator.unregister()
+  if (actEnvironmentDescriptor === undefined) {
+    Reflect.deleteProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT")
+  } else {
+    Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", actEnvironmentDescriptor)
+  }
 })
 
 beforeEach(() => {
@@ -115,11 +140,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  await actAsync(() => {
-    for (const root of roots.splice(0)) {
-      root.unmount()
-    }
-  })
+  await unmountAll()
 })
 
 describe("SessionProvider", () => {
@@ -135,24 +156,15 @@ describe("SessionProvider", () => {
     expect(container.textContent).toBe("content")
   })
 
-  it("marks the session ready by default", async () => {
-    const container = await render(<SessionProvider fallback={loading}>{content}</SessionProvider>)
-
-    expect(container.textContent).toBe("content")
-    expect(postedEvents()).toContain("web_app_ready")
-  })
-
-  it("leaves markReady to the app when autoReady is false", async () => {
+  it("leaves readiness to the app by default", async () => {
     const container = await render(
-      <SessionProvider autoReady={false} fallback={loading}>
-        {captureSession}
-      </SessionProvider>,
+      <SessionProvider fallback={loading}>{captureSession}</SessionProvider>,
     )
 
     expect(container.textContent).toBe("content")
     expect(postedEvents()).not.toContain("web_app_ready")
     const session = captured.session
-    expect(session).not.toBeNull()
+    expect(session?.status.get()).toBe("mounted")
 
     await actAsync(() => {
       session?.markReady()
@@ -160,6 +172,18 @@ describe("SessionProvider", () => {
 
     expect(postedEvents()).toContain("web_app_ready")
     expect(session?.status.get()).toBe("ready")
+  })
+
+  it("marks the session ready when autoReady is true", async () => {
+    const container = await render(
+      <SessionProvider autoReady fallback={loading}>
+        {captureSession}
+      </SessionProvider>,
+    )
+
+    expect(container.textContent).toBe("content")
+    expect(postedEvents()).toContain("web_app_ready")
+    expect(captured.session?.status.get()).toBe("ready")
   })
 
   it("does not change native behavior by default", async () => {
@@ -184,6 +208,23 @@ describe("SessionProvider", () => {
 
     expect(postedEvents()).toContain("web_app_expand")
     expect(postedEvents()).toContain("web_app_setup_swipe_behavior")
+  })
+
+  it("restores vertical swipes before closing the session on unmount", async () => {
+    setLaunchUrl(launchWithoutInitData("ios"))
+
+    await render(
+      <SessionProvider disableVerticalSwipes fallback={loading}>
+        {content}
+      </SessionProvider>,
+    )
+    await emitInAct("viewport_changed", { height: 640, is_state_stable: true, is_expanded: true })
+
+    expect(swipeStates()).toEqual([false])
+
+    await unmountAll()
+
+    expect(swipeStates()).toEqual([false, true])
   })
 
   it("reports initialization failures through onError and keeps the fallback", async () => {

@@ -25,6 +25,6 @@ export type {
 export type { WriteAccessStatus } from "./lib/request-write-access"
 export { createSession } from "./lib/session"
 export type { Features, Session, SessionStatus } from "./lib/session"
-export type { Store } from "./lib/store"
+export type { ReadonlyStore, Store } from "./lib/store"
 export type { SwipeBehavior } from "./lib/swipe-behavior"
 export type { Viewport, ViewportState } from "./lib/viewport"

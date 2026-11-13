@@ -1,7 +1,8 @@
 import type { Protocol } from "#lib/protocol/client"
 
 import { createProtocol, invokeBestEffort } from "#lib/protocol/client"
-import { createStore } from "#lib/store"
+import { getBrowserWindow } from "#lib/protocol/transport"
+import { createScalarStore } from "#lib/store"
 
 import type { BackButton } from "./back-button"
 import type { HapticFeedback } from "./haptic-feedback"
@@ -9,9 +10,8 @@ import type { InitData } from "./init-data"
 import type { LaunchParams } from "./launch-params"
 import type { OpenLinkOptions } from "./links"
 import type { MiniApp } from "./mini-app"
-import type { EventName, EventPayloads } from "./protocol/methods"
 import type { WriteAccessStatus } from "./request-write-access"
-import type { Store } from "./store"
+import type { ReadonlyStore } from "./store"
 import type { SwipeBehavior } from "./swipe-behavior"
 import type { TelegramRuntime } from "./telegram-runtime"
 import type { Viewport } from "./viewport"
@@ -25,6 +25,7 @@ import { retrieveLaunchParams } from "./launch-params"
 import { createOpenLink, createOpenTelegramLink } from "./links"
 import { createMiniApp } from "./mini-app"
 import { createRequestWriteAccess } from "./request-write-access"
+import { createReplayingProtocol, installEarlyEventCapture } from "./session/replay"
 import { createSwipeBehavior } from "./swipe-behavior"
 import { createViewport } from "./viewport"
 
@@ -48,61 +49,14 @@ type Session = {
   requireInitData: () => InitData
   protocol: Protocol
   features: Features
-  status: Store<SessionStatus>
+  status: ReadonlyStore<SessionStatus>
   start: () => Promise<void>
   markReady: () => void
   destroy: () => void
 }
 
-const statefulEvents = [
-  "viewport_changed",
-  "fullscreen_changed",
-  "safe_area_changed",
-  "content_safe_area_changed",
-  "theme_changed",
-  "visibility_changed",
-] as const satisfies readonly EventName[]
-
-/**
- * Keeps the last payload of every stateful event and replays it to a new
- * subscriber. Telegram sends some events before the app has subscribed, so a
- * plain `on` would lose the first viewport, theme or visibility state.
- */
-const createReplayingProtocol = (protocol: Protocol): Protocol => {
-  const lastPayloads = new Map<EventName, EventPayloads[EventName]>()
-
-  for (const event of statefulEvents) {
-    protocol.on(event, (payload) => {
-      lastPayloads.set(event, payload)
-    })
-  }
-
-  const on: Protocol["on"] = (event, handler) => {
-    let delivered = false
-    const unsubscribe = protocol.on(event, (payload) => {
-      delivered = true
-      handler(payload)
-    })
-
-    const lastPayload = lastPayloads.get(event)
-    if (!delivered && lastPayload !== undefined) {
-      // The event name and its payload are correlated by the protocol table.
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      handler(lastPayload as EventPayloads[typeof event])
-    }
-
-    return unsubscribe
-  }
-
-  return {
-    ...protocol,
-    on,
-    destroy: () => {
-      lastPayloads.clear()
-      protocol.destroy()
-    },
-  }
-}
+// Capture stateful events that Telegram sends before the app creates its session.
+installEarlyEventCapture()
 
 const createFeatures = (runtime: TelegramRuntime, launch: LaunchParams): Features => {
   return {
@@ -130,6 +84,7 @@ const createFeatures = (runtime: TelegramRuntime, launch: LaunchParams): Feature
  * @throws If launch parameters could not be retrieved (not a Telegram environment).
  */
 const createSession = (): Session => {
+  const browserWindow = getBrowserWindow()
   const launch = retrieveLaunchParams()
   const rawInitData = launch.tgWebAppData
   const initData =
@@ -141,11 +96,12 @@ const createSession = (): Session => {
     platform: launch.tgWebAppPlatform,
     version: launch.tgWebAppVersion,
     signal: abortController.signal,
+    window: browserWindow,
   })
-  const protocol = createReplayingProtocol(baseProtocol)
+  const protocol = createReplayingProtocol(baseProtocol, browserWindow)
   const runtime: TelegramRuntime = { protocol, disposer }
   const features = createFeatures(runtime, launch)
-  const status = createStore<SessionStatus>("launched")
+  const status = createScalarStore<SessionStatus>("launched")
   let startPromise: Promise<void> | null = null
   let unbindCssVars: (() => void) | null = null
   let isDestroyed = false
@@ -201,9 +157,7 @@ const createSession = (): Session => {
       if (typeof document !== "undefined") {
         unbindCssVars ??= features.viewport.bindCssVars()
       }
-      if (status.get() === "launched") {
-        status.set("mounted")
-      }
+      status.set("mounted")
     } catch (error) {
       if (!isDestroyed) {
         status.set("failed")
@@ -223,16 +177,26 @@ const createSession = (): Session => {
     },
     protocol,
     features,
-    status,
+    status: {
+      get: status.get,
+      subscribe: status.subscribe,
+    },
     start: async () => {
       if (isDestroyed) {
         throw new Error("Cannot start a closed Telegram Mini App session")
+      }
+      if (status.get() === "failed") {
+        throw new Error("Cannot start a failed Telegram Mini App session")
+      }
+      if (status.get() !== "launched") {
+        return
       }
       startPromise ??= startSession()
       await startPromise
     },
     markReady: () => {
-      if (isDestroyed || status.get() === "ready") {
+      // Readiness is the app's decision, but only after the viewport has mounted.
+      if (status.get() !== "mounted") {
         return
       }
       features.miniApp.ready()
