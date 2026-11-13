@@ -4,15 +4,15 @@ import type { ViewportState } from "#lib/viewport"
 
 import { initialViewportState } from "#lib/viewport"
 
-import { useTelegram } from "./use-telegram"
+import { useSession } from "./use-session"
 
 const useViewportState = (): ViewportState => {
-  const { store } = useTelegram().viewport
+  const { store } = useSession().features.viewport
   return useSyncExternalStore(store.subscribe, store.get, () => initialViewportState)
 }
 
 const useIsFullscreen = (): boolean => {
-  const { store } = useTelegram().viewport
+  const { store } = useSession().features.viewport
   return useSyncExternalStore(
     store.subscribe,
     () => store.get().isFullscreen,

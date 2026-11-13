@@ -23,8 +23,8 @@ export type {
   Platform,
 } from "./lib/protocol/methods"
 export type { WriteAccessStatus } from "./lib/request-write-access"
+export { createSession } from "./lib/session"
+export type { Features, Session, SessionStatus } from "./lib/session"
 export type { Store } from "./lib/store"
 export type { SwipeBehavior } from "./lib/swipe-behavior"
-export { createTelegramSession } from "./lib/telegram"
-export type { Telegram, TelegramSession } from "./lib/telegram"
 export type { Viewport, ViewportState } from "./lib/viewport"
