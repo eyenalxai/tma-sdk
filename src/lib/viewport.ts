@@ -5,7 +5,7 @@ import { invokeBestEffort } from "#lib/protocol/client"
 import type { Store } from "./store"
 import type { TelegramRuntime } from "./telegram-runtime"
 
-import { isDesktopPlatform } from "./platform"
+import { getPlatform } from "./platform"
 import { createStore } from "./store"
 import { bindViewportCssVariables } from "./viewport-css-vars"
 
@@ -47,6 +47,7 @@ const createViewport = (
 ): Viewport => {
   const { protocol } = runtime
   const { platform } = options
+  const platformInfo = getPlatform(platform)
   const isFullscreenSupported = protocol.mayInvoke("web_app_request_fullscreen")
   const initialViewportRequestTimeoutMs = 5000
 
@@ -87,7 +88,7 @@ const createViewport = (
       }),
     )
 
-    if (isDesktopPlatform(platform) || !protocol.mayInvoke("web_app_request_viewport")) {
+    if (!platformInfo.supportsViewport || !protocol.mayInvoke("web_app_request_viewport")) {
       store.update({ isExpanded: true })
     } else {
       try {

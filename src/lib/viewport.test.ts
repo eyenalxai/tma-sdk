@@ -49,9 +49,12 @@ const installFakeWindow = (posts: string[]) => {
   }
 }
 
-const createTestEnvironment = (platform: string) => {
+const createTestEnvironment = (platform: string, ancestorOrigin?: string) => {
   const posts: string[] = []
   const { fakeWindow, restore } = installFakeWindow(posts)
+  if (ancestorOrigin !== undefined) {
+    fakeWindow.location = { ancestorOrigins: [ancestorOrigin] }
+  }
   const disposer = createDisposer()
   const abortController = new AbortController()
   const protocol = createProtocol({
@@ -88,7 +91,7 @@ const createTestEnvironment = (platform: string) => {
 }
 
 describe("createViewport", () => {
-  it("mounts desktop platforms without requesting the viewport", async () => {
+  it("mounts web embeds without requesting the viewport", async () => {
     const environment = createTestEnvironment("web")
     try {
       const viewport = createViewport(environment.runtime, {
@@ -145,7 +148,7 @@ describe("createViewport", () => {
     }
   })
 
-  it("skips the content safe-area request on macOS", async () => {
+  it("mounts macOS without requesting the null viewport", async () => {
     const environment = createTestEnvironment("macos")
     try {
       const viewport = createViewport(environment.runtime, {
@@ -155,7 +158,26 @@ describe("createViewport", () => {
 
       await viewport.mount()
 
+      expect(viewport.store.get().height).toBe(800)
+      expect(viewport.store.get().isExpanded).toBe(true)
       expect(environment.posts).toEqual(["web_app_request_safe_area"])
+    } finally {
+      environment.restoreWindow()
+    }
+  })
+
+  it("mounts Web K without requesting a viewport it never answers", async () => {
+    const environment = createTestEnvironment("web", "https://webk.telegram.org")
+    try {
+      const viewport = createViewport(environment.runtime, {
+        platform: "web",
+        isFullscreen: false,
+      })
+
+      await viewport.mount()
+
+      expect(environment.posts).toEqual([])
+      expect(viewport.store.get().isExpanded).toBe(true)
     } finally {
       environment.restoreWindow()
     }
