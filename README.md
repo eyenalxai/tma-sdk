@@ -106,7 +106,21 @@ const initData = validateInitData(rawInitData, process.env.BOT_TOKEN, {
 })
 ```
 
-`validateInitData()` verifies the Telegram signature, validates `auth_date`, applies expiration, parses the signed payload, and throws on failure. Use `isInitDataValid()` when a boolean check is preferred.
+`validateInitData()` verifies the Telegram HMAC, validates `auth_date`, applies expiration, parses the signed payload, and throws on failure. Use `isInitDataValid()` when a boolean check is preferred.
+
+A third party without the bot token can verify the same init data with Telegram's Ed25519 public key:
+
+```ts
+import { validateInitDataSignature } from "@eyenalxai/tma-sdk/server"
+
+const initData = validateInitDataSignature(rawInitData, {
+  botId: 1234567890,
+  publicKey: "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d",
+  expiresIn: 86_400,
+})
+```
+
+Pass Telegram's production key for production init data and the test key for test-environment data. The key is the raw 32-byte hex value from the Telegram documentation.
 
 Keep the bot token server-side. Never expose it to Mini App client code.
 

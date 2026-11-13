@@ -15,7 +15,7 @@ Telegram-signed launch data identifying the Mini App user and related context.
 _Avoid_: auth payload, Telegram profile
 
 **Init-data validation**:
-Server-side verification of Mini App init data against the bot token signature and expiration rules.
+Server-side verification of Mini App init data against the bot-token HMAC or Telegram's Ed25519 public key, plus expiration rules.
 _Avoid_: login validation, token validation
 
 ### Session and protocol
