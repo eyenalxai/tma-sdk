@@ -1,19 +1,44 @@
 import { describe, expect, it } from "bun:test"
 
-import { isDesktopPlatform } from "./platform"
+import type { PlatformKind } from "./platform"
 
-describe("isDesktopPlatform", () => {
-  it.each(["macos", "tdesktop", "unigram", "windows", "web", "weba", "webk"])(
-    "treats %s as a desktop platform",
-    (platform) => {
-      expect(isDesktopPlatform(platform)).toBe(true)
+import { getPlatform } from "./platform"
+
+type PlatformCase = readonly [
+  name: string,
+  kind: PlatformKind,
+  supportsViewport: boolean,
+  isEmbeddedWeb: boolean,
+]
+
+const platformCases: readonly PlatformCase[] = [
+  ["ios", "mobile", true, false],
+  ["android", "mobile", true, false],
+  ["android_x", "mobile", true, false],
+  ["macos", "desktop", true, false],
+  ["tdesktop", "desktop", true, false],
+  ["unigram", "desktop", false, false],
+  ["windows", "desktop", false, false],
+  ["web", "web", false, true],
+  ["weba", "web", false, true],
+  ["webk", "web", false, true],
+  ["unknown", "unknown", false, false],
+]
+
+describe("getPlatform", () => {
+  it.each(platformCases)(
+    "maps %s to its capabilities",
+    (name, kind, supportsViewport, isEmbeddedWeb) => {
+      expect(getPlatform(name)).toEqual({ name, kind, supportsViewport, isEmbeddedWeb })
     },
   )
 
-  it.each(["android", "android_x", "ios", "unknown"])(
-    "does not treat %s as a desktop platform",
-    (platform) => {
-      expect(isDesktopPlatform(platform)).toBe(false)
-    },
-  )
+  it("keeps the raw name for a platform the table does not observe", () => {
+    expect(getPlatform("blackberry")).toEqual({
+      name: "blackberry",
+      kind: "unknown",
+      supportsViewport: false,
+      isEmbeddedWeb: false,
+    })
+  })
 })

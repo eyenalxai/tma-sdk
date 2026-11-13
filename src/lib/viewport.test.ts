@@ -88,7 +88,7 @@ const createTestEnvironment = (platform: string) => {
 }
 
 describe("createViewport", () => {
-  it("mounts desktop platforms without requesting the viewport", async () => {
+  it("mounts web embeds without requesting the viewport", async () => {
     const environment = createTestEnvironment("web")
     try {
       const viewport = createViewport(environment.runtime, {
@@ -145,7 +145,7 @@ describe("createViewport", () => {
     }
   })
 
-  it("skips the content safe-area request on macOS", async () => {
+  it("requests the viewport on macOS and finishes when the null payload arrives", async () => {
     const environment = createTestEnvironment("macos")
     try {
       const viewport = createViewport(environment.runtime, {
@@ -153,9 +153,40 @@ describe("createViewport", () => {
         isFullscreen: false,
       })
 
+      let isMounted = false
+      const mountTracking = (async () => {
+        await viewport.mount()
+        isMounted = true
+      })()
+      await flushMicrotasks()
+
+      expect(isMounted).toBe(false)
+      expect(environment.posts).toEqual(["web_app_request_viewport"])
+
+      environment.emit("viewport_changed", null)
+      await mountTracking
+
+      expect(isMounted).toBe(true)
+      expect(viewport.store.get().height).toBe(800)
+      expect(viewport.store.get().isExpanded).toBe(true)
+      expect(environment.posts).toEqual(["web_app_request_viewport", "web_app_request_safe_area"])
+    } finally {
+      environment.restoreWindow()
+    }
+  })
+
+  it("mounts Web K without requesting a viewport it never answers", async () => {
+    const environment = createTestEnvironment("webk")
+    try {
+      const viewport = createViewport(environment.runtime, {
+        platform: "webk",
+        isFullscreen: false,
+      })
+
       await viewport.mount()
 
-      expect(environment.posts).toEqual(["web_app_request_safe_area"])
+      expect(environment.posts).toEqual([])
+      expect(viewport.store.get().isExpanded).toBe(true)
     } finally {
       environment.restoreWindow()
     }
