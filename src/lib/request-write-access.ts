@@ -1,9 +1,8 @@
+import type { FeatureController } from "#lib/features/controller"
 import type { TelegramRuntime } from "#lib/telegram-runtime"
 
 import { USER_CONFIRMATION_TIMEOUT_MS } from "#lib/protocol/client"
 import { createStore } from "#lib/store"
-
-import type { FeatureController } from "./features/controller"
 
 type WriteAccessStatus = "allowed" | "cancelled"
 

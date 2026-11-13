@@ -232,13 +232,15 @@ describe("SessionProvider", () => {
 
     await render(<SessionProvider fallback={loading}>{content}</SessionProvider>)
     await emitInAct("viewport_changed", { height: 640, is_state_stable: true, is_expanded: true })
-    await emitInAct("theme_changed", {
-      theme_params: { bg_color: "#ffffff" },
-      color_scheme: "light",
-    })
+    await emitInAct("theme_changed", { theme_params: { bg_color: "#ffffff" } })
 
     expect(document.documentElement.style.getPropertyValue("--tg-theme-bg-color")).toBe("#ffffff")
     expect(document.documentElement.style.getPropertyValue("--tg-color-scheme")).toBe("light")
+
+    await emitInAct("theme_changed", { theme_params: { bg_color: "#000000" } })
+
+    expect(document.documentElement.style.getPropertyValue("--tg-theme-bg-color")).toBe("#000000")
+    expect(document.documentElement.style.getPropertyValue("--tg-color-scheme")).toBe("dark")
   })
 
   it("reports initialization failures through onError and keeps the fallback", async () => {

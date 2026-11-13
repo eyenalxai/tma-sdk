@@ -1,12 +1,11 @@
+import type { ThemeCssVariableTarget } from "#lib/features/theme/css-vars"
 import type { TelegramRuntime } from "#lib/telegram-runtime"
 
+import { bindThemeCssVariables } from "#lib/features/theme/css-vars"
 import { invokeBestEffort } from "#lib/protocol/client"
 import { createStore } from "#lib/store"
 
 import type { FeatureController } from "./controller"
-import type { ThemeCssVariableTarget } from "./theme-css-vars"
-
-import { bindThemeCssVariables } from "./theme-css-vars"
 
 type ThemeColorScheme = "light" | "dark"
 
@@ -32,6 +31,46 @@ const initialThemeState: ThemeState = {
   colorScheme: null,
 }
 
+const HEX_COLOR_PATTERN = /^[0-9a-f]{6}$/iu
+
+const parseHexColor = (value: string | undefined): readonly [number, number, number] | null => {
+  if (value === undefined) {
+    return null
+  }
+  const normalized = value.replaceAll(/[#\s]/gu, "")
+  const hex =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((digit) => digit + digit)
+          .join("")
+      : normalized
+  if (!HEX_COLOR_PATTERN.test(hex)) {
+    return null
+  }
+  return [
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ]
+}
+
+/**
+ * Telegram's official script derives the scheme from `theme_params.bg_color`
+ * with the HSP formula, so the client does not send `color_scheme`.
+ */
+const deriveColorScheme = (
+  themeParams: Readonly<Record<string, string>>,
+): ThemeColorScheme | null => {
+  const rgb = parseHexColor(themeParams.bg_color)
+  if (rgb === null) {
+    return null
+  }
+  const [red, green, blue] = rgb
+  const hsp = Math.sqrt(0.299 * red * red + 0.587 * green * green + 0.114 * blue * blue)
+  return hsp < 120 ? "dark" : "light"
+}
+
 const createTheme = (runtime: TelegramRuntime): ThemeController => {
   const { protocol } = runtime
   const supported = protocol.mayInvoke("web_app_request_theme")
@@ -41,7 +80,7 @@ const createTheme = (runtime: TelegramRuntime): ThemeController => {
     protocol.on("theme_changed", (payload) => {
       store.set({
         themeParams: payload.theme_params,
-        colorScheme: payload.color_scheme ?? null,
+        colorScheme: deriveColorScheme(payload.theme_params),
       })
     }),
   )

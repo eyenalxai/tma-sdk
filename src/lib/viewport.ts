@@ -1,9 +1,9 @@
+import type { FeatureController } from "#lib/features/controller"
 import type { PartialSafeAreaInsets, SafeAreaInsets } from "#lib/protocol/methods"
 
 import { invokeBestEffort } from "#lib/protocol/client"
 import { createStore } from "#lib/store"
 
-import type { FeatureController } from "./features/controller"
 import type { TelegramRuntime } from "./telegram-runtime"
 
 import { getPlatform } from "./platform"

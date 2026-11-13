@@ -1,6 +1,5 @@
+import type { ThemeState } from "#lib/features/theme"
 import type { ReadonlyStore } from "#lib/store"
-
-import type { ThemeState } from "./theme"
 
 type ThemeCssVariableTarget = {
   style: Pick<CSSStyleDeclaration, "setProperty" | "removeProperty">

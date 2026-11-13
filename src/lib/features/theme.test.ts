@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
-import { createTestRuntime } from "#lib/protocol/test-support"
+import type { ThemeCssVariableTarget } from "#lib/features/theme/css-vars"
 
-import type { ThemeCssVariableTarget } from "./theme-css-vars"
+import { createTestRuntime } from "#lib/protocol/test-support"
 
 import { createTheme } from "./theme"
 
@@ -29,7 +29,6 @@ const themePayload = {
     secondary_bg_color: "#f0f0f0",
     button_color: "#2481cc",
   },
-  color_scheme: "light",
 }
 
 describe("createTheme", () => {
@@ -93,6 +92,57 @@ describe("createTheme", () => {
     }
   })
 
+  it("binds the derived dark color scheme from a dark background", () => {
+    const environment = createTestRuntime("ios", "9.6")
+    try {
+      const theme = createTheme(environment.runtime)
+      const { properties, target } = createTarget()
+      const unbind = theme.actions.bindCssVars(target)
+
+      environment.emit("theme_changed", { theme_params: { bg_color: "#000000" } })
+
+      expect(theme.state.get().colorScheme).toBe("dark")
+      expect(properties.get("--tg-color-scheme")).toBe("dark")
+
+      unbind()
+    } finally {
+      environment.dispose()
+    }
+  })
+
+  it("derives the scheme from shorthand and whitespace-padded backgrounds", () => {
+    const environment = createTestRuntime("ios", "9.6")
+    try {
+      const theme = createTheme(environment.runtime)
+
+      environment.emit("theme_changed", { theme_params: { bg_color: "#000" } })
+      expect(theme.state.get().colorScheme).toBe("dark")
+
+      environment.emit("theme_changed", { theme_params: { bg_color: "  #FFFFFF  " } })
+      expect(theme.state.get().colorScheme).toBe("light")
+    } finally {
+      environment.dispose()
+    }
+  })
+
+  it("leaves the color scheme null for a missing or malformed background", () => {
+    const environment = createTestRuntime("ios", "9.6")
+    try {
+      const theme = createTheme(environment.runtime)
+
+      environment.emit("theme_changed", { theme_params: {} })
+      expect(theme.state.get().colorScheme).toBeNull()
+
+      environment.emit("theme_changed", { theme_params: { bg_color: "not-a-color" } })
+      expect(theme.state.get().colorScheme).toBeNull()
+
+      environment.emit("theme_changed", { theme_params: { bg_color: "#12345" } })
+      expect(theme.state.get().colorScheme).toBeNull()
+    } finally {
+      environment.dispose()
+    }
+  })
+
   it("posts header, background and bottom-bar colors", () => {
     const environment = createTestRuntime("ios", "9.6")
     try {
@@ -123,22 +173,6 @@ describe("createTheme", () => {
       expect(environment.posts).toEqual([
         { eventType: "web_app_set_background_color", eventData: '{"color":"#000000"}' },
       ])
-    } finally {
-      environment.dispose()
-    }
-  })
-
-  it("leaves the color scheme null when the payload omits it", () => {
-    const environment = createTestRuntime("ios", "9.6")
-    try {
-      const theme = createTheme(environment.runtime)
-
-      environment.emit("theme_changed", { theme_params: { bg_color: "#000000" } })
-
-      expect(theme.state.get()).toEqual({
-        themeParams: { bg_color: "#000000" },
-        colorScheme: null,
-      })
     } finally {
       environment.dispose()
     }

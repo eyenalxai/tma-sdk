@@ -1,9 +1,8 @@
+import type { FeatureController } from "#lib/features/controller"
 import type { MethodParams, OpenLinkBrowser } from "#lib/protocol/methods"
 import type { TelegramRuntime } from "#lib/telegram-runtime"
 
 import { createConstantStore } from "#lib/store"
-
-import type { FeatureController } from "./features/controller"
 
 type OpenLinkOptions = {
   tryInstantView?: boolean

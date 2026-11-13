@@ -101,7 +101,6 @@ const viewportFallback = (browserWindow?: ViewportFallbackWindow): object => {
 
 const themeChangedEventSchema = z.looseObject({
   theme_params: z.record(z.string(), z.string()),
-  color_scheme: z.enum(["light", "dark"]).optional(),
 })
 
 const invoiceClosedEventSchema = z.looseObject({

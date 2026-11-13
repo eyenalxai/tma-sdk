@@ -88,10 +88,7 @@ describe("feature registry", () => {
   it("tracks controller state as actions run", async () => {
     const { environment, restoreWindow, features } = createRegistry()
     try {
-      environment.emit("theme_changed", {
-        theme_params: { bg_color: "#ffffff" },
-        color_scheme: "light",
-      })
+      environment.emit("theme_changed", { theme_params: { bg_color: "#ffffff" } })
       expect(features.theme.state.get().colorScheme).toBe("light")
 
       features.backButton.actions.show()

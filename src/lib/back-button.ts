@@ -1,9 +1,8 @@
+import type { FeatureController } from "#lib/features/controller"
 import type { TelegramRuntime } from "#lib/telegram-runtime"
 
 import { invokeBestEffort } from "#lib/protocol/client"
 import { createStore } from "#lib/store"
-
-import type { FeatureController } from "./features/controller"
 
 type BackButtonState = {
   isVisible: boolean

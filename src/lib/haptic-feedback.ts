@@ -1,10 +1,9 @@
+import type { FeatureController } from "#lib/features/controller"
 import type { HapticFeedbackParams } from "#lib/protocol/methods"
 import type { TelegramRuntime } from "#lib/telegram-runtime"
 
 import { invokeBestEffort } from "#lib/protocol/client"
 import { createConstantStore } from "#lib/store"
-
-import type { FeatureController } from "./features/controller"
 
 type ImpactHapticFeedbackStyle = Extract<HapticFeedbackParams, { type: "impact" }>["impact_style"]
 type NotificationHapticFeedbackType = Extract<

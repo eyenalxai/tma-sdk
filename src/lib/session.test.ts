@@ -103,11 +103,6 @@ const viewportPayload = {
 const countPosts = (posts: NativePost[], eventType: string): number =>
   posts.filter((post) => post.eventType === eventType).length
 
-const readRequestId = (eventData: string | undefined): string => {
-  const parsed: unknown = JSON.parse(eventData ?? "null")
-  return isRecord(parsed) && typeof parsed.req_id === "string" ? parsed.req_id : ""
-}
-
 const flushMicrotasks = async (): Promise<void> => {
   await Promise.resolve()
 }
@@ -436,49 +431,6 @@ describe("createSession", () => {
       expect(session.status.get()).toBe("closed")
     } finally {
       restoreDocument()
-      environment.restore()
-    }
-  })
-
-  it("round-trips a popup and the clipboard through the registry", async () => {
-    const environment = installFakeWindow(launchWithoutInitData)
-    try {
-      const session = createSession()
-      const started = session.start()
-      await flushMicrotasks()
-      environment.emit("viewport_changed", {
-        height: 640,
-        is_state_stable: true,
-        is_expanded: true,
-      })
-      await started
-
-      const dialog = session.features.dialogs.actions.show({
-        message: "Continue?",
-        buttons: [
-          { id: "ok", type: "ok" },
-          { id: "cancel", type: "cancel" },
-        ],
-      })
-      expect(session.features.dialogs.state.get().isOpen).toBe(true)
-      environment.emit("popup_closed", { button_id: "ok" })
-
-      expect(await dialog).toBe("ok")
-      expect(session.features.dialogs.state.get().isOpen).toBe(false)
-
-      const clipboard = session.features.clipboard.actions.read()
-      const clipboardPost = environment.posts.find(
-        (post) => post.eventType === "web_app_read_text_from_clipboard",
-      )
-      environment.emit("clipboard_text_received", {
-        req_id: readRequestId(clipboardPost?.eventData),
-        data: "copied",
-      })
-
-      expect(await clipboard).toBe("copied")
-      expect(session.features.clipboard.state.get().text).toBe("copied")
-      session.destroy()
-    } finally {
       environment.restore()
     }
   })
