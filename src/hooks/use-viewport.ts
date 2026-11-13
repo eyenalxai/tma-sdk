@@ -7,15 +7,15 @@ import { initialViewportState } from "#lib/viewport"
 import { useSession } from "./use-session"
 
 const useViewportState = (): ViewportState => {
-  const { store } = useSession().features.viewport
-  return useSyncExternalStore(store.subscribe, store.get, () => initialViewportState)
+  const { state } = useSession().features.viewport
+  return useSyncExternalStore(state.subscribe, state.get, () => initialViewportState)
 }
 
 const useIsFullscreen = (): boolean => {
-  const { store } = useSession().features.viewport
+  const { state } = useSession().features.viewport
   return useSyncExternalStore(
-    store.subscribe,
-    () => store.get().isFullscreen,
+    state.subscribe,
+    () => state.get().isFullscreen,
     () => false,
   )
 }

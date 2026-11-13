@@ -227,6 +227,20 @@ describe("SessionProvider", () => {
     expect(swipeStates()).toEqual([false, true])
   })
 
+  it("binds the theme CSS variables when the theme changes", async () => {
+    setLaunchUrl(launchWithoutInitData("ios"))
+
+    await render(<SessionProvider fallback={loading}>{content}</SessionProvider>)
+    await emitInAct("viewport_changed", { height: 640, is_state_stable: true, is_expanded: true })
+    await emitInAct("theme_changed", {
+      theme_params: { bg_color: "#ffffff" },
+      color_scheme: "light",
+    })
+
+    expect(document.documentElement.style.getPropertyValue("--tg-theme-bg-color")).toBe("#ffffff")
+    expect(document.documentElement.style.getPropertyValue("--tg-color-scheme")).toBe("light")
+  })
+
   it("reports initialization failures through onError and keeps the fallback", async () => {
     setLaunchUrl("")
 

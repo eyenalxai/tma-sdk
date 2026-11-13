@@ -12,12 +12,12 @@ describe("createBackButton", () => {
     const environment = createTestRuntime("ios", "9.6")
     try {
       const backButton = createBackButton(environment.runtime)
-      expect(backButton.store.get().isVisible).toBe(false)
+      expect(backButton.feature.state.get().isVisible).toBe(false)
 
       backButton.sync()
 
       expect(visibilityPosts(environment.posts)).toEqual(['{"is_visible":false}'])
-      backButton.hide()
+      backButton.feature.actions.hide()
       expect(visibilityPosts(environment.posts)).toEqual(['{"is_visible":false}'])
     } finally {
       environment.dispose()
@@ -30,17 +30,36 @@ describe("createBackButton", () => {
       const backButton = createBackButton(environment.runtime)
 
       backButton.sync()
-      backButton.show()
-      backButton.show()
-      backButton.hide()
-      backButton.hide()
+      backButton.feature.actions.show()
+      backButton.feature.actions.show()
+      backButton.feature.actions.hide()
+      backButton.feature.actions.hide()
 
       expect(visibilityPosts(environment.posts)).toEqual([
         '{"is_visible":false}',
         '{"is_visible":true}',
         '{"is_visible":false}',
       ])
-      expect(backButton.store.get().isVisible).toBe(false)
+      expect(backButton.feature.state.get().isVisible).toBe(false)
+    } finally {
+      environment.dispose()
+    }
+  })
+
+  it("delivers back_button_pressed through the feature", () => {
+    const environment = createTestRuntime("ios", "9.6")
+    try {
+      const backButton = createBackButton(environment.runtime)
+      let presses = 0
+      const unsubscribe = backButton.feature.actions.onClick(() => {
+        presses += 1
+      })
+
+      environment.emit("back_button_pressed", null)
+      unsubscribe()
+      environment.emit("back_button_pressed", null)
+
+      expect(presses).toBe(1)
     } finally {
       environment.dispose()
     }
