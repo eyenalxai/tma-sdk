@@ -18,6 +18,20 @@ const catchFailure = async (promise: Promise<unknown>): Promise<unknown> => {
   throw new Error("Expected the request to reject")
 }
 
+const trackSettlement = (promise: Promise<unknown>): (() => boolean) => {
+  let isSettled = false
+  const track = async (): Promise<void> => {
+    try {
+      await promise
+    } catch {
+      // The test observes settlement, and asserts the outcome separately.
+    }
+    isSettled = true
+  }
+  void track()
+  return () => isSettled
+}
+
 describe("createProtocol invoke", () => {
   it("sends a method on a supported platform", () => {
     const { browserWindow, posts } = createNativeWindow()
@@ -253,6 +267,156 @@ describe("createProtocol request", () => {
     expect(
       await catchFailure(protocol.request({ method: ["web_app_request_viewport"] })),
     ).toMatchObject({ message: "Cannot subscribe to a destroyed protocol" })
+  })
+
+  it("queues a second request for the same method behind the first", async () => {
+    const { browserWindow, posts, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+    const first = protocol.request({ method: ["web_app_request_write_access"] })
+    const second = protocol.request({ method: ["web_app_request_write_access"] })
+
+    // Only the first call is on the wire; the second waits for its turn.
+    expect(posts).toEqual([{ eventType: "web_app_request_write_access", eventData: '""' }])
+
+    const isSecondSettled = trackSettlement(second)
+
+    emit("write_access_requested", { status: "allowed" })
+    expect(await first).toEqual({
+      event: "write_access_requested",
+      payload: { status: "allowed" },
+    })
+    await Promise.resolve()
+
+    // One reply settles one request. The queued call starts on its own.
+    expect(isSecondSettled()).toBe(false)
+    expect(posts).toEqual([
+      { eventType: "web_app_request_write_access", eventData: '""' },
+      { eventType: "web_app_request_write_access", eventData: '""' },
+    ])
+
+    emit("write_access_requested", { status: "cancelled" })
+    expect(await second).toEqual({
+      event: "write_access_requested",
+      payload: { status: "cancelled" },
+    })
+    protocol.destroy()
+  })
+
+  it("does not serialize requests for different methods", async () => {
+    const { browserWindow, posts, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+
+    const viewport = protocol.request({ method: ["web_app_request_viewport"] })
+    const writeAccess = protocol.request({ method: ["web_app_request_write_access"] })
+
+    expect(posts).toEqual([
+      { eventType: "web_app_request_viewport", eventData: '""' },
+      { eventType: "web_app_request_write_access", eventData: '""' },
+    ])
+
+    emit("viewport_changed", { height: 1, is_state_stable: true, is_expanded: true })
+    emit("write_access_requested", { status: "allowed" })
+
+    expect(await viewport).toMatchObject({ event: "viewport_changed" })
+    expect(await writeAccess).toMatchObject({ event: "write_access_requested" })
+    protocol.destroy()
+  })
+
+  it("releases the method gate after a timeout", async () => {
+    const { browserWindow, emit } = createNativeWindow()
+    const protocol = createProtocol({
+      platform: "ios",
+      version: "9.6",
+      window: browserWindow,
+      defaultTimeout: 5,
+    })
+    const first = protocol.request({ method: ["web_app_request_viewport"] })
+    const second = protocol.request({ method: ["web_app_request_viewport"] })
+
+    expect(await catchFailure(first)).toBeInstanceOf(ProtocolTimeoutError)
+    await Promise.resolve()
+
+    emit("viewport_changed", { height: 320, is_state_stable: true, is_expanded: false })
+    expect(await second).toEqual({
+      event: "viewport_changed",
+      payload: { height: 320, is_state_stable: true, is_expanded: false },
+    })
+    protocol.destroy()
+  })
+
+  it("ignores a reply whose req_id does not match the request", async () => {
+    const { browserWindow, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+    const pending = protocol.request({
+      method: ["web_app_read_text_from_clipboard", { req_id: "wanted" }],
+      correlate: (result) => result.payload.req_id === "wanted",
+    })
+
+    emit("clipboard_text_received", { req_id: "other", data: "stale" })
+    const isSettled = trackSettlement(pending)
+    await Promise.resolve()
+    expect(isSettled()).toBe(false)
+
+    emit("clipboard_text_received", { req_id: "wanted", data: "fresh" })
+    expect(await pending).toEqual({
+      event: "clipboard_text_received",
+      payload: { req_id: "wanted", data: "fresh" },
+    })
+    protocol.destroy()
+  })
+
+  it("releases the method gate after an aborted request", async () => {
+    const abortController = new AbortController()
+    const { browserWindow, emit } = createNativeWindow()
+    const protocol = createProtocol({
+      platform: "ios",
+      version: "9.6",
+      window: browserWindow,
+      defaultTimeout: 100,
+    })
+    const first = protocol.request({
+      method: ["web_app_request_write_access"],
+      signal: abortController.signal,
+    })
+    const second = protocol.request({ method: ["web_app_request_write_access"] })
+
+    abortController.abort()
+
+    expect(await catchFailure(first)).toMatchObject({
+      message: 'Request "web_app_request_write_access" was aborted',
+      name: "AbortError",
+    })
+    await Promise.resolve()
+
+    emit("write_access_requested", { status: "allowed" })
+    expect(await second).toEqual({
+      event: "write_access_requested",
+      payload: { status: "allowed" },
+    })
+    protocol.destroy()
+  })
+
+  it("rejects a queued request when its signal aborts before its turn", async () => {
+    const abortController = new AbortController()
+    const { browserWindow, posts, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+    const first = protocol.request({ method: ["web_app_request_write_access"] })
+    const second = protocol.request({
+      method: ["web_app_request_write_access"],
+      signal: abortController.signal,
+    })
+
+    abortController.abort()
+
+    expect(await catchFailure(second)).toMatchObject({
+      message: 'Request "web_app_request_write_access" was aborted',
+      name: "AbortError",
+    })
+    expect(posts).toHaveLength(1)
+
+    emit("write_access_requested", { status: "allowed" })
+    expect(await first).toMatchObject({ event: "write_access_requested" })
+    protocol.destroy()
   })
 
   it("validates the event list and the timeout", async () => {

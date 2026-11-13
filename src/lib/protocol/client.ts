@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- the request state machine and its gate share one protocol closure */
 import { createDisposer } from "#lib/disposer"
 
 import type {
@@ -34,6 +35,10 @@ type RequestOptions<M extends Method> = {
   method: MethodArgs<M>
   events?: readonly MethodEvents<M>[]
   timeout?: number
+  /** Aborts just this request; the protocol keeps working. */
+  signal?: AbortSignal
+  /** Return false for a reply that belongs to another request; the call keeps waiting. */
+  correlate?: (result: RequestResult<MethodEvents<M>>) => boolean
 }
 
 type Request = <M extends Method>(
@@ -66,6 +71,41 @@ type CreateProtocolOptions = {
   defaultTimeout?: number
 }
 
+const noop = (): void => undefined
+
+const waitForSettled = async (
+  settled: Promise<void>,
+  method: Method,
+  signals: readonly AbortSignal[],
+): Promise<void> => {
+  if (signals.length === 0) {
+    await settled
+    return
+  }
+
+  const removeAbortListeners: (() => void)[] = []
+  const abortPromise = new Promise<never>((_resolve, reject) => {
+    const abortListener = (): void => {
+      reject(createAbortError(method))
+    }
+    for (const abortSignal of signals) {
+      // oxlint-disable-next-line react-doctor/rn-no-dimensions-get
+      abortSignal.addEventListener("abort", abortListener, { once: true })
+      removeAbortListeners.push(() => {
+        abortSignal.removeEventListener("abort", abortListener)
+      })
+    }
+  })
+
+  try {
+    await Promise.race([settled, abortPromise])
+  } finally {
+    for (const removeAbortListener of removeAbortListeners) {
+      removeAbortListener()
+    }
+  }
+}
+
 const createProtocol = (options: CreateProtocolOptions): Protocol => {
   const { platform, version, signal, defaultTimeout = DEFAULT_TIMEOUT_MS } = options
   const browserWindow = options.window ?? getBrowserWindow()
@@ -73,6 +113,8 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
   const capabilityPlatform = platform === "web" && isWebKWindow(browserWindow) ? "webk" : platform
   const transport = createTransport(browserWindow)
   const handlerSets = new Map<EventName, Set<(payload: unknown) => void>>()
+  // One in-flight request per method key; the value settles when the request does.
+  const pendingMethods = new Map<Method, Promise<void>>()
   const disposer = createDisposer()
   let isDestroyed = false
   const getCapabilityFor = (method: Method): Capability =>
@@ -133,12 +175,45 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
     }
   }
 
+  const acquireMethod = (method: Method): (() => void) => {
+    let release = noop
+    const settled = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    pendingMethods.set(method, settled)
+
+    return () => {
+      if (pendingMethods.get(method) !== settled) {
+        return
+      }
+      pendingMethods.delete(method)
+      release()
+    }
+  }
+
+  const waitForMethodTurn = async (
+    method: Method,
+    signals: readonly AbortSignal[],
+  ): Promise<() => void> => {
+    for (;;) {
+      const previous = pendingMethods.get(method)
+      if (previous === undefined) {
+        return acquireMethod(method)
+      }
+      // oxlint-disable-next-line no-await-in-loop, react-doctor/async-await-in-loop
+      await waitForSettled(previous, method, signals)
+    }
+  }
+
   const request = async <M extends Method>(
     requestOptions: RequestOptions<M>,
   ): Promise<RequestResult<MethodEvents<M>>> => {
     const method = requestOptions.method[0]
     const events = requestOptions.events ?? methodTable[method].events
     const timeout = requestOptions.timeout ?? defaultTimeout
+    const signals = [signal, requestOptions.signal].filter(
+      (candidate): candidate is AbortSignal => candidate !== undefined,
+    )
 
     if (events.length === 0) {
       throw new Error(`Request "${method}" must wait for at least one event`)
@@ -146,91 +221,106 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
     if (!Number.isFinite(timeout) || timeout < 0) {
       throw new Error("Request timeout must be a non-negative finite number")
     }
-    if (signal?.aborted === true) {
+    if (signals.some((abortSignal) => abortSignal.aborted)) {
       throw createAbortError(method)
     }
 
-    return new Promise<RequestResult<MethodEvents<M>>>((resolve, reject) => {
-      const requestDisposer = createDisposer()
-      let isSettled = false
+    const start = async (releaseMethod: () => void): Promise<RequestResult<MethodEvents<M>>> =>
+      new Promise<RequestResult<MethodEvents<M>>>((resolve, reject) => {
+        const requestDisposer = createDisposer()
+        let isSettled = false
 
-      const settle = (action: () => void): void => {
-        if (isSettled) {
-          return
+        const settle = (action: () => void): void => {
+          if (isSettled) {
+            return
+          }
+          isSettled = true
+          releaseMethod()
+          requestDisposer.dispose()
+          action()
         }
-        isSettled = true
-        requestDisposer.dispose()
-        action()
-      }
 
-      const timeoutId = setTimeout(() => {
-        settle(() => {
-          reject(
-            new ProtocolTimeoutError({
-              method,
-              platform: capabilityPlatform,
-              version,
-              events,
-              timeout,
-            }),
-          )
+        const timeoutId = setTimeout(() => {
+          settle(() => {
+            reject(
+              new ProtocolTimeoutError({
+                method,
+                platform: capabilityPlatform,
+                version,
+                events,
+                timeout,
+              }),
+            )
+          })
+        }, timeout)
+        requestDisposer.add(() => {
+          clearTimeout(timeoutId)
         })
-      }, timeout)
-      requestDisposer.add(() => {
-        clearTimeout(timeoutId)
-      })
 
-      const abortListener = (): void => {
-        settle(() => {
-          reject(createAbortError(method))
-        })
-      }
-      signal?.addEventListener("abort", abortListener, { once: true })
-      requestDisposer.add(() => {
-        signal?.removeEventListener("abort", abortListener)
-      })
+        const abortListener = (): void => {
+          settle(() => {
+            reject(createAbortError(method))
+          })
+        }
+        for (const abortSignal of signals) {
+          // oxlint-disable-next-line react-doctor/rn-no-dimensions-get
+          abortSignal.addEventListener("abort", abortListener, { once: true })
+          requestDisposer.add(() => {
+            abortSignal.removeEventListener("abort", abortListener)
+          })
+        }
 
-      try {
-        for (const event of events) {
-          requestDisposer.add(
-            on(event, (payload) => {
-              settle(() => {
+        try {
+          for (const event of events) {
+            requestDisposer.add(
+              on(event, (payload) => {
                 // The event/payload pair is correlated by the table at runtime.
                 // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-                resolve({ event, payload } as RequestResult<MethodEvents<M>>)
-              })
-            }),
-          )
+                const result = { event, payload } as RequestResult<MethodEvents<M>>
+                if (requestOptions.correlate !== undefined && !requestOptions.correlate(result)) {
+                  return
+                }
+                settle(() => {
+                  resolve(result)
+                })
+              }),
+            )
+          }
+        } catch (error) {
+          settle(() => {
+            reject(
+              error instanceof Error
+                ? error
+                : new Error("Unable to subscribe to Telegram events", { cause: error }),
+            )
+          })
+          return
         }
-      } catch (error) {
-        settle(() => {
-          reject(
-            error instanceof Error
-              ? error
-              : new Error("Unable to subscribe to Telegram events", { cause: error }),
-          )
-        })
-        return
-      }
 
-      if (signal?.aborted === true) {
-        abortListener()
-        return
-      }
+        if (signals.some((abortSignal) => abortSignal.aborted)) {
+          abortListener()
+          return
+        }
 
-      try {
-        const [requestMethod, requestParams] = requestOptions.method
-        invoke(requestMethod, requestParams)
-      } catch (error) {
-        settle(() => {
-          reject(
-            error instanceof Error
-              ? error
-              : new Error("Unable to send Telegram event", { cause: error }),
-          )
-        })
-      }
-    })
+        try {
+          const [requestMethod, requestParams] = requestOptions.method
+          invoke(requestMethod, requestParams)
+        } catch (error) {
+          settle(() => {
+            reject(
+              error instanceof Error
+                ? error
+                : new Error("Unable to send Telegram event", { cause: error }),
+            )
+          })
+        }
+      })
+
+    if (pendingMethods.has(method)) {
+      return start(await waitForMethodTurn(method, signals))
+    }
+
+    return start(acquireMethod(method))
   }
 
   return {
