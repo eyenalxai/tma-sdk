@@ -856,41 +856,41 @@ const methodTable = {
   web_app_device_storage_save_key: {
     events: ["device_storage_key_saved", "device_storage_failed"],
     since: "9.0",
-    correlate: { param: "req_id", reply: "req_id" },
+    correlate: { param: "req_id", reply: "req_id", optionalReply: true },
   },
   web_app_device_storage_get_key: {
     events: ["device_storage_key_received", "device_storage_failed"],
     since: "9.0",
-    correlate: { param: "req_id", reply: "req_id" },
+    correlate: { param: "req_id", reply: "req_id", optionalReply: true },
   },
   web_app_device_storage_clear: {
     events: ["device_storage_cleared", "device_storage_failed"],
     since: "9.0",
-    correlate: { param: "req_id", reply: "req_id" },
+    correlate: { param: "req_id", reply: "req_id", optionalReply: true },
   },
   web_app_secure_storage_save_key: {
     events: ["secure_storage_key_saved", "secure_storage_failed"],
     since: "9.0",
     platforms: { tdesktop: "unsupported", windows: "unsupported", ...unsupportedOnWebK },
-    correlate: { param: "req_id", reply: "req_id" },
+    correlate: { param: "req_id", reply: "req_id", optionalReply: true },
   },
   web_app_secure_storage_get_key: {
     events: ["secure_storage_key_received", "secure_storage_failed"],
     since: "9.0",
     platforms: { tdesktop: "unsupported", windows: "unsupported", ...unsupportedOnWebK },
-    correlate: { param: "req_id", reply: "req_id" },
+    correlate: { param: "req_id", reply: "req_id", optionalReply: true },
   },
   web_app_secure_storage_restore_key: {
     events: ["secure_storage_key_restored", "secure_storage_failed"],
     since: "9.0",
     platforms: { tdesktop: "unsupported", windows: "unsupported", ...unsupportedOnWebK },
-    correlate: { param: "req_id", reply: "req_id" },
+    correlate: { param: "req_id", reply: "req_id", optionalReply: true },
   },
   web_app_secure_storage_clear: {
     events: ["secure_storage_cleared", "secure_storage_failed"],
     since: "9.0",
     platforms: { tdesktop: "unsupported", windows: "unsupported", ...unsupportedOnWebK },
-    correlate: { param: "req_id", reply: "req_id" },
+    correlate: { param: "req_id", reply: "req_id", optionalReply: true },
   },
 } as const satisfies Record<Method, MethodDefinition>
 

@@ -81,6 +81,25 @@ describe("createProtocol request", () => {
     protocol.destroy()
   })
 
+  it("settles a storage failure that omits req_id", async () => {
+    const { browserWindow, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+    const pending = protocol.request({
+      method: [
+        "web_app_device_storage_save_key",
+        { req_id: "req-1", key: "test-key", value: "test-value" },
+      ],
+    })
+
+    emit("device_storage_failed", { error: "UNSUPPORTED" })
+
+    expect(await pending).toEqual({
+      event: "device_storage_failed",
+      payload: { error: "UNSUPPORTED" },
+    })
+    protocol.destroy()
+  })
+
   it("carries the method, platform and version on a timeout", async () => {
     const { browserWindow } = createNativeWindow()
     const protocol = createProtocol({
