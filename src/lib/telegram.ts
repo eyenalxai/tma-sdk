@@ -1,3 +1,7 @@
+import type { Protocol } from "#lib/protocol/client"
+
+import { createProtocol, invokeBestEffort } from "#lib/protocol/client"
+
 import type { BackButton } from "./back-button"
 import type { HapticFeedback } from "./haptic-feedback"
 import type { InitData } from "./init-data"
@@ -12,14 +16,11 @@ import type { Viewport } from "./viewport"
 import { createBackButton } from "./back-button"
 import { createDisposer } from "./disposer"
 import { createDownloadFile } from "./download-file"
-import { createEventHub } from "./event-hub"
 import { createHapticFeedback } from "./haptic-feedback"
 import { parseInitData } from "./init-data"
 import { retrieveLaunchParams } from "./launch-params"
 import { createOpenLink, createOpenTelegramLink } from "./links"
 import { createMiniApp } from "./mini-app"
-import { postEvent } from "./post-event"
-import { createRequest } from "./request"
 import { createRequestWriteAccess } from "./request-write-access"
 import { createSwipeBehavior } from "./swipe-behavior"
 import { createViewport } from "./viewport"
@@ -28,6 +29,7 @@ type Telegram = {
   launchParams: LaunchParams
   rawInitData: string
   initData: InitData
+  protocol: Protocol
   miniApp: MiniApp
   backButton: BackButton
   viewport: Viewport
@@ -46,7 +48,7 @@ type TelegramSession = {
 
 /**
  * Creates a Telegram Mini App session: reads launch parameters and init data,
- * wires up the Telegram client event protocol and creates feature controllers.
+ * wires up the Telegram client protocol and creates feature controllers.
  *
  * Client-only: must be called in a browser environment (inside Telegram).
  * @throws If launch parameters could not be retrieved (not a Telegram environment).
@@ -61,25 +63,26 @@ const createTelegramSession = (): TelegramSession => {
 
   const disposer = createDisposer()
   const abortController = new AbortController()
-  const hub = createEventHub()
-  const request = createRequest({ hub, signal: abortController.signal })
-  const runtime: TelegramRuntime = {
+  const protocol = createProtocol({
+    platform: launchParams.tgWebAppPlatform,
     version: launchParams.tgWebAppVersion,
-    hub,
-    request,
+    signal: abortController.signal,
+  })
+  const runtime: TelegramRuntime = {
+    protocol,
     disposer,
   }
 
   try {
     disposer.add(() => {
-      hub.destroy()
+      protocol.destroy()
     })
     disposer.add(() => {
       abortController.abort()
     })
     disposer.add(
-      hub.on("reload_iframe", () => {
-        postEvent("iframe_will_reload")
+      protocol.on("reload_iframe", () => {
+        invokeBestEffort(protocol, "iframe_will_reload")
         window.location.reload()
       }),
     )
@@ -92,13 +95,15 @@ const createTelegramSession = (): TelegramSession => {
       style.remove()
     })
     disposer.add(
-      hub.on("set_custom_style", (html) => {
+      protocol.on("set_custom_style", (html) => {
         style.innerHTML = html
       }),
     )
 
     // Notify Telegram that the iframe is ready, enabling style and reload events.
-    postEvent("iframe_ready", { reload_supported: true })
+    if (protocol.isFramed && protocol.mayInvoke("iframe_ready")) {
+      protocol.invoke("iframe_ready", { reload_supported: true })
+    }
   } catch (error) {
     disposer.dispose()
     throw error
@@ -109,6 +114,7 @@ const createTelegramSession = (): TelegramSession => {
       launchParams,
       rawInitData,
       initData,
+      protocol,
       miniApp: createMiniApp(runtime),
       backButton: createBackButton(runtime),
       viewport: createViewport(runtime, {

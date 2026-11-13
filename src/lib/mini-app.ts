@@ -1,7 +1,6 @@
-import type { TelegramRuntime } from "./telegram-runtime"
+import { invokeBestEffort } from "#lib/protocol/client"
 
-import { postEvent, postEventBestEffort } from "./post-event"
-import { supports, supportsParam } from "./version"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 type MiniApp = {
   ready: () => void
@@ -10,22 +9,23 @@ type MiniApp = {
 }
 
 const createMiniApp = (runtime: TelegramRuntime): MiniApp => {
-  const { version } = runtime
+  const { protocol } = runtime
+  const isReadySupported = protocol.mayInvoke("web_app_ready")
 
   return {
     ready: () => {
-      postEvent("web_app_ready")
+      if (isReadySupported) {
+        invokeBestEffort(protocol, "web_app_ready")
+      }
     },
     setHeaderColor: (color) => {
       // RGB header colors require Mini Apps 6.9+.
-      if (supportsParam("web_app_set_header_color.color", version)) {
-        postEventBestEffort("web_app_set_header_color", { color })
+      if (protocol.supportsParam("web_app_set_header_color", "color")) {
+        invokeBestEffort(protocol, "web_app_set_header_color", { color })
       }
     },
     setBgColor: (color) => {
-      if (supports("web_app_set_background_color", version)) {
-        postEventBestEffort("web_app_set_background_color", { color })
-      }
+      invokeBestEffort(protocol, "web_app_set_background_color", { color })
     },
   }
 }

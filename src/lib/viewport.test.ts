@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test"
 
-import type { TelegramEventSink } from "./event-bridge"
-import type { PostEventArgs } from "./post-event"
+import type { ProtocolWindow } from "#lib/protocol/transport"
+
+import { createProtocol } from "#lib/protocol/client"
+
 import type { TelegramRuntime } from "./telegram-runtime"
 
 import { createDisposer } from "./disposer"
-import { createEventHub } from "./event-hub"
-import { createRequest } from "./request"
 import { createViewport } from "./viewport"
 
 const flushMicrotasks = async (): Promise<void> => {
@@ -14,15 +14,17 @@ const flushMicrotasks = async (): Promise<void> => {
 }
 
 const installFakeWindow = (posts: string[]) => {
-  const fakeWindow: Record<string, unknown> = {
+  const fakeWindow: ProtocolWindow = {
     innerHeight: 800,
     innerWidth: 400,
     TelegramWebviewProxy: {
-      // Records posts routed through the real postEvent.
+      // Records posts routed through the real protocol transport.
       postEvent: (method: string) => {
         posts.push(method)
       },
     },
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
   }
   fakeWindow.self = fakeWindow
   fakeWindow.top = fakeWindow
@@ -35,43 +37,37 @@ const installFakeWindow = (posts: string[]) => {
     value: fakeWindow,
   })
 
-  return () => {
-    if (descriptor === undefined) {
-      Reflect.deleteProperty(globalThis, "window")
-    } else {
-      Object.defineProperty(globalThis, "window", descriptor)
-    }
+  return {
+    fakeWindow,
+    restore: () => {
+      if (descriptor === undefined) {
+        Reflect.deleteProperty(globalThis, "window")
+      } else {
+        Object.defineProperty(globalThis, "window", descriptor)
+      }
+    },
   }
 }
 
-const createTestEnvironment = () => {
+const createTestEnvironment = (platform: string) => {
   const posts: string[] = []
-  const restoreWindow = installFakeWindow(posts)
-
-  let sink: TelegramEventSink | null = null
-  const hub = createEventHub((nextSink) => {
-    sink = nextSink
-    return () => {
-      sink = null
-    }
-  })
+  const { fakeWindow, restore } = installFakeWindow(posts)
   const disposer = createDisposer()
   const abortController = new AbortController()
-  // Mirrors the session teardown order: abort in-flight requests, then destroy the hub.
+  const protocol = createProtocol({
+    platform,
+    version: "9.6",
+    window: fakeWindow,
+    signal: abortController.signal,
+  })
+  // Mirrors the session teardown order: abort in-flight requests, then destroy the protocol.
   disposer.add(() => {
-    hub.destroy()
+    protocol.destroy()
   })
   disposer.add(() => {
     abortController.abort()
   })
-  const request = createRequest({
-    hub,
-    signal: abortController.signal,
-    postEvent: (...args: PostEventArgs) => {
-      posts.push(args[0])
-    },
-  })
-  const runtime: TelegramRuntime = { version: "9.6", hub, request, disposer }
+  const runtime: TelegramRuntime = { protocol, disposer }
 
   return {
     runtime,
@@ -80,15 +76,20 @@ const createTestEnvironment = () => {
       disposer.dispose()
     },
     emit: (eventType: string, eventData?: unknown) => {
-      sink?.(eventType, eventData)
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      const receive = fakeWindow.TelegramGameProxy_receiveEvent as (
+        eventType: string,
+        eventData?: unknown,
+      ) => void
+      receive(eventType, eventData)
     },
-    restoreWindow,
+    restoreWindow: restore,
   }
 }
 
 describe("createViewport", () => {
   it("mounts desktop platforms without requesting the viewport", async () => {
-    const environment = createTestEnvironment()
+    const environment = createTestEnvironment("web")
     try {
       const viewport = createViewport(environment.runtime, {
         platform: "web",
@@ -108,7 +109,7 @@ describe("createViewport", () => {
   })
 
   it("waits for the viewport event on mobile platforms", async () => {
-    const environment = createTestEnvironment()
+    const environment = createTestEnvironment("ios")
     try {
       const viewport = createViewport(environment.runtime, {
         platform: "ios",
@@ -145,7 +146,7 @@ describe("createViewport", () => {
   })
 
   it("skips the content safe-area request on macOS", async () => {
-    const environment = createTestEnvironment()
+    const environment = createTestEnvironment("macos")
     try {
       const viewport = createViewport(environment.runtime, {
         platform: "macos",
@@ -161,7 +162,7 @@ describe("createViewport", () => {
   })
 
   it("does not post safe-area requests when disposed while waiting", async () => {
-    const environment = createTestEnvironment()
+    const environment = createTestEnvironment("ios")
     try {
       const viewport = createViewport(environment.runtime, {
         platform: "ios",

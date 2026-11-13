@@ -28,6 +28,18 @@ _Avoid_: Telegram context, SDK instance
 The client-side communication layer connecting the Mini App to Telegram's event transport for web or native clients.
 _Avoid_: event bus, WebView bridge
 
+**Protocol table**:
+The single source for every Telegram method's wire name, params, response events, introduced version, raw-payload flag and per-platform capability.
+_Avoid_: method registry, wire map
+
+**Transport adapter**:
+The layer that sends protocol messages over the native proxy, the legacy `window.external.notify` channel or the iframe `postMessage` channel, and installs the inbound receive-event globals.
+_Avoid_: bridge, post-event
+
+**Capability**:
+The tri-state answer for whether a Telegram method is available: `supported`, `unsupported` or `unknown`. Only hard evidence produces `unsupported`.
+_Avoid_: support flag, feature flag
+
 **Telegram method**:
 A command a Mini App sends to the Telegram client over the Telegram event bridge.
 _Avoid_: request, API call, command

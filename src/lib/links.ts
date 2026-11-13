@@ -1,8 +1,6 @@
-import type { OpenLinkBrowser, TelegramMethodParams } from "./post-event"
-import type { TelegramRuntime } from "./telegram-runtime"
+import type { MethodParams, OpenLinkBrowser } from "#lib/protocol/methods"
 
-import { postEvent } from "./post-event"
-import { supports, supportsParam } from "./version"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 type OpenLinkOptions = {
   tryInstantView?: boolean
@@ -14,20 +12,21 @@ const TELEGRAM_HOSTNAMES = new Set(["t.me", "telegram.me", "telegram.dog"])
 const createOpenLink =
   (runtime: TelegramRuntime) =>
   (url: string | URL, linkOptions: OpenLinkOptions = {}): void => {
-    const params: TelegramMethodParams["web_app_open_link"] = { url: new URL(url).toString() }
+    const { protocol } = runtime
+    const params: MethodParams<"web_app_open_link"> = { url: new URL(url).toString() }
     if (
       linkOptions.tryBrowser !== undefined &&
-      supportsParam("web_app_open_link.try_browser", runtime.version)
+      protocol.supportsParam("web_app_open_link", "try_browser")
     ) {
       params.try_browser = linkOptions.tryBrowser
     }
     if (
       linkOptions.tryInstantView !== undefined &&
-      supportsParam("web_app_open_link.try_instant_view", runtime.version)
+      protocol.supportsParam("web_app_open_link", "try_instant_view")
     ) {
       params.try_instant_view = linkOptions.tryInstantView
     }
-    postEvent("web_app_open_link", params)
+    protocol.invoke("web_app_open_link", params)
   }
 
 const createOpenTelegramLink =
@@ -39,8 +38,8 @@ const createOpenTelegramLink =
     }
 
     const path = parsed.pathname + parsed.search
-    if (supports("web_app_open_tg_link", runtime.version)) {
-      postEvent("web_app_open_tg_link", { path_full: path })
+    if (runtime.protocol.mayInvoke("web_app_open_tg_link")) {
+      runtime.protocol.invoke("web_app_open_tg_link", { path_full: path })
       return
     }
 

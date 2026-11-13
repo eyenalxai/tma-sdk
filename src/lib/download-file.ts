@@ -1,7 +1,6 @@
-import type { TelegramRuntime } from "./telegram-runtime"
+import { USER_CONFIRMATION_TIMEOUT_MS } from "#lib/protocol/client"
 
-import { USER_CONFIRMATION_TIMEOUT_MS } from "./request"
-import { supports } from "./version"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 /**
  * Displays a native popup prompting the user to download a file.
@@ -10,13 +9,13 @@ import { supports } from "./version"
 const createDownloadFile =
   (runtime: TelegramRuntime) =>
   async (url: string, fileName: string): Promise<void> => {
-    if (!supports("web_app_request_file_download", runtime.version)) {
+    const { protocol } = runtime
+    if (!protocol.mayInvoke("web_app_request_file_download")) {
       throw new Error("File download is not supported in this Telegram version")
     }
 
-    const { payload } = await runtime.request({
+    const { payload } = await protocol.request({
       method: ["web_app_request_file_download", { url, file_name: fileName }],
-      events: ["file_download_requested"],
       timeout: USER_CONFIRMATION_TIMEOUT_MS,
     })
 
