@@ -11,6 +11,16 @@ export type { LaunchParams } from "./lib/launch-params"
 export type { OpenLinkOptions } from "./lib/links"
 export type { MiniApp } from "./lib/mini-app"
 export { isDesktopPlatform } from "./lib/platform"
+export type { Protocol, RequestOptions, RequestResult } from "./lib/protocol/client"
+export { ProtocolTimeoutError, UnsupportedMethodError } from "./lib/protocol/client"
+export type {
+  Capability,
+  EventName,
+  EventPayloads,
+  Method,
+  MethodParams,
+  Platform,
+} from "./lib/protocol/methods"
 export type { WriteAccessStatus } from "./lib/request-write-access"
 export type { Store } from "./lib/store"
 export type { SwipeBehavior } from "./lib/swipe-behavior"

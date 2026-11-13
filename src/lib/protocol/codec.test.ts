@@ -1,0 +1,109 @@
+import { describe, expect, it } from "bun:test"
+
+import { encodeMethod, parseEventPayload } from "./codec"
+import { methodTable } from "./methods"
+
+describe("encodeMethod", () => {
+  it("serializes a payloadless method the way the official bridge does", () => {
+    expect(encodeMethod("web_app_ready", undefined)).toEqual({
+      eventType: "web_app_ready",
+      eventData: "",
+      nativePayload: '""',
+    })
+  })
+
+  it("serializes method parameters for the JSON envelope and the native proxy", () => {
+    expect(encodeMethod("web_app_setup_back_button", { is_visible: true })).toEqual({
+      eventType: "web_app_setup_back_button",
+      eventData: { is_visible: true },
+      nativePayload: '{"is_visible":true}',
+    })
+  })
+
+  it("wraps a raw string payload in the method's wire field", () => {
+    expect(encodeMethod("web_app_data_send", "hello")).toEqual({
+      eventType: "web_app_data_send",
+      eventData: { data: "hello" },
+      nativePayload: '{"data":"hello"}',
+    })
+  })
+
+  it("uses the table wire name for every row", () => {
+    for (const [method, definition] of Object.entries(methodTable)) {
+      const params = "raw" in definition && definition.raw ? "" : undefined
+      const message = encodeMethod(method as never, params as never)
+      expect(message.eventType).toBe(method)
+    }
+  })
+})
+
+describe("parseEventPayload", () => {
+  it("accepts a null, omitted or empty payload for a payloadless event", () => {
+    expect(parseEventPayload("back_button_pressed", null)).toBeNull()
+    expect(parseEventPayload("back_button_pressed")).toBeNull()
+    expect(parseEventPayload("back_button_pressed", {})).toBeNull()
+  })
+
+  it("parses a structured event payload", () => {
+    expect(
+      parseEventPayload("content_safe_area_changed", {
+        top: 12,
+        bottom: 24,
+        left: 0,
+        right: 0,
+      }),
+    ).toEqual({ top: 12, bottom: 24, left: 0, right: 0 })
+  })
+
+  it("parses a JSON-encoded event payload", () => {
+    expect(parseEventPayload("file_download_requested", '{"status":"downloading"}')).toEqual({
+      status: "downloading",
+    })
+  })
+
+  it("parses a theme change event", () => {
+    expect(
+      parseEventPayload("theme_changed", {
+        theme_params: { bg_color: "#ffffff", text_color: "#000000" },
+      }),
+    ).toEqual({ theme_params: { bg_color: "#ffffff", text_color: "#000000" } })
+  })
+
+  it("parses a viewport change event", () => {
+    expect(
+      parseEventPayload("viewport_changed", {
+        height: 640,
+        is_state_stable: true,
+        is_expanded: false,
+      }),
+    ).toEqual({ height: 640, is_state_stable: true, is_expanded: false })
+  })
+
+  it("falls back to window dimensions for a null viewport payload", () => {
+    // Telegram for macOS sends a null viewport payload.
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { innerHeight: 480, innerWidth: 320 },
+    })
+
+    try {
+      expect(parseEventPayload("viewport_changed", null)).toEqual({
+        height: 480,
+        width: 320,
+        is_state_stable: true,
+        is_expanded: true,
+      })
+    } finally {
+      Reflect.deleteProperty(globalThis, "window")
+    }
+  })
+
+  it("accepts the boolean strings macOS sends for biometry info", () => {
+    expect(
+      parseEventPayload("biometry_info_received", {
+        available: "true",
+        access_requested: "false",
+      }),
+    ).toMatchObject({ available: true, access_requested: false })
+  })
+})

@@ -1,11 +1,10 @@
-import type { SafeAreaInsets } from "./event-schemas"
+import type { SafeAreaInsets } from "./protocol/methods"
 import type { Store } from "./store"
 import type { TelegramRuntime } from "./telegram-runtime"
 
 import { isDesktopPlatform } from "./platform"
-import { postEventBestEffort } from "./post-event"
+import { invokeBestEffort } from "./protocol/client"
 import { createStore } from "./store"
-import { supports } from "./version"
 import { bindViewportCssVariables } from "./viewport-css-vars"
 
 type ViewportState = {
@@ -44,9 +43,9 @@ const createViewport = (
   runtime: TelegramRuntime,
   options: { platform: string; isFullscreen: boolean },
 ): Viewport => {
-  const { version } = runtime
+  const { protocol } = runtime
   const { platform } = options
-  const isFullscreenSupported = supports("web_app_request_fullscreen", version)
+  const isFullscreenSupported = protocol.supports("web_app_request_fullscreen") !== "unsupported"
   const initialViewportRequestTimeoutMs = 5000
 
   const store = createStore<ViewportState>({
@@ -61,7 +60,7 @@ const createViewport = (
 
   const doMount = async (): Promise<void> => {
     runtime.disposer.add(
-      runtime.hub.on("viewport_changed", (event) => {
+      protocol.on("viewport_changed", (event) => {
         store.update({
           height: event.height,
           width: event.width ?? window.innerWidth,
@@ -71,28 +70,30 @@ const createViewport = (
       }),
     )
     runtime.disposer.add(
-      runtime.hub.on("fullscreen_changed", (event) => {
+      protocol.on("fullscreen_changed", (event) => {
         store.update({ isFullscreen: event.is_fullscreen })
       }),
     )
     runtime.disposer.add(
-      runtime.hub.on("safe_area_changed", (insets) => {
+      protocol.on("safe_area_changed", (insets) => {
         store.update({ safeAreaInsets: insets })
       }),
     )
     runtime.disposer.add(
-      runtime.hub.on("content_safe_area_changed", (insets) => {
+      protocol.on("content_safe_area_changed", (insets) => {
         store.update({ contentSafeAreaInsets: insets })
       }),
     )
 
-    if (isDesktopPlatform(platform)) {
+    if (
+      isDesktopPlatform(platform) ||
+      protocol.supports("web_app_request_viewport") === "unsupported"
+    ) {
       store.update({ isExpanded: true })
     } else {
       try {
-        await runtime.request({
+        await protocol.request({
           method: ["web_app_request_viewport"],
-          events: ["viewport_changed"],
           timeout: initialViewportRequestTimeoutMs,
         })
       } catch (error) {
@@ -108,11 +109,11 @@ const createViewport = (
 
     // Best-effort: Web K and Unigram never answer these requests. Mount must not stall on them.
     // Telegram for macOS answers the content safe-area request with `safe_area_changed` instead.
-    if (supports("web_app_request_safe_area", version)) {
-      postEventBestEffort("web_app_request_safe_area")
+    if (protocol.supports("web_app_request_safe_area") !== "unsupported") {
+      invokeBestEffort(protocol, "web_app_request_safe_area")
     }
-    if (platform !== "macos" && supports("web_app_request_content_safe_area", version)) {
-      postEventBestEffort("web_app_request_content_safe_area")
+    if (protocol.supports("web_app_request_content_safe_area") !== "unsupported") {
+      invokeBestEffort(protocol, "web_app_request_content_safe_area")
     }
   }
 
@@ -121,9 +122,8 @@ const createViewport = (
       throw new Error("Fullscreen mode is not supported in this Telegram version")
     }
 
-    const result = await runtime.request({
+    const result = await protocol.request({
       method: fullscreen ? ["web_app_request_fullscreen"] : ["web_app_exit_fullscreen"],
-      events: ["fullscreen_changed", "fullscreen_failed"],
       timeout: initialViewportRequestTimeoutMs,
     })
 
@@ -147,7 +147,9 @@ const createViewport = (
       return mountPromise
     },
     expand: () => {
-      postEventBestEffort("web_app_expand")
+      if (protocol.supports("web_app_expand") !== "unsupported") {
+        invokeBestEffort(protocol, "web_app_expand")
+      }
     },
     requestFullscreen: async () => changeFullscreen(true),
     exitFullscreen: async () => changeFullscreen(false),

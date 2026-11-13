@@ -1,9 +1,8 @@
 import type { Store } from "./store"
 import type { TelegramRuntime } from "./telegram-runtime"
 
-import { postEventBestEffort } from "./post-event"
+import { invokeBestEffort } from "./protocol/client"
 import { createStore } from "./store"
-import { supports } from "./version"
 
 type BackButtonState = {
   isVisible: boolean
@@ -18,14 +17,15 @@ type BackButton = {
 }
 
 const createBackButton = (runtime: TelegramRuntime): BackButton => {
-  const isSupported = supports("web_app_setup_back_button", runtime.version)
+  const { protocol } = runtime
+  const isSupported = protocol.supports("web_app_setup_back_button") !== "unsupported"
   const store = createStore<BackButtonState>({ isVisible: false })
 
   const setVisible = (isVisible: boolean) => {
     if (!isSupported || store.get().isVisible === isVisible) {
       return
     }
-    if (postEventBestEffort("web_app_setup_back_button", { is_visible: isVisible })) {
+    if (invokeBestEffort(protocol, "web_app_setup_back_button", { is_visible: isVisible })) {
       store.set({ isVisible })
     }
   }
@@ -39,7 +39,7 @@ const createBackButton = (runtime: TelegramRuntime): BackButton => {
     hide: () => {
       setVisible(false)
     },
-    onClick: (listener) => runtime.hub.on("back_button_pressed", listener),
+    onClick: (listener) => protocol.on("back_button_pressed", listener),
   }
 }
 
