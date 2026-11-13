@@ -252,6 +252,25 @@ describe("transport", () => {
     )
   })
 
+  it("prefers a native proxy over a framed page with a non-allowlisted ancestor", () => {
+    const { browserWindow, messages } = createIframeWindow({
+      ancestorOrigin: "https://evil.example",
+    })
+    const posts: NativePost[] = []
+    browserWindow.TelegramWebviewProxy = {
+      postEvent: (eventType: string, eventData: string) => {
+        posts.push({ eventType, eventData })
+      },
+    }
+
+    const protocol = createProtocol({ platform: "web", version: "9.0", window: browserWindow })
+    protocol.invoke("web_app_ready")
+
+    expect(posts).toEqual([{ eventType: "web_app_ready", eventData: '""' }])
+    expect(messages).toHaveLength(0)
+    protocol.destroy()
+  })
+
   it("falls back to * only with a source check", () => {
     const { browserWindow, messages, parent, dispatch } = createIframeWindow()
     const protocol = createProtocol({ platform: "web", version: "9.0", window: browserWindow })
