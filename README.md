@@ -71,15 +71,19 @@ const parsedLaunchParams = parseLaunchParams(new URLSearchParams(location.search
 
 `retrieveLaunchParams()` preserves validated Telegram launch parameters in session storage so client-side navigation does not discard the original launch context.
 
-## Desktop platform detection
+## Platform capability
 
 ```ts
-import { isDesktopPlatform, retrieveLaunchParams } from "@eyenalxai/tma-sdk"
+import { getPlatform, retrieveLaunchParams } from "@eyenalxai/tma-sdk"
 
-isDesktopPlatform(retrieveLaunchParams().tgWebAppPlatform)
+const platform = getPlatform(retrieveLaunchParams().tgWebAppPlatform)
+
+platform.kind // "mobile" | "desktop" | "web" | "unknown"
+platform.supportsViewport // true when the client provides a usable viewport height
+platform.isEmbeddedWeb // true for web, weba and webk
 ```
 
-`isDesktopPlatform()` returns `true` when the launching client lays out the Mini App without resizing its viewport: `macos`, `tdesktop`, `windows`, `web`, and the legacy `unigram`, `weba`, and `webk` values.
+`getPlatform()` replaces `isDesktopPlatform()`. The old desktop predicate is `kind === "desktop" || kind === "web"`; use `supportsViewport` for the viewport request strategy. macOS is a desktop client that answers with a null payload, so it does not request a viewport and uses the window height.
 
 ## Server validation
 

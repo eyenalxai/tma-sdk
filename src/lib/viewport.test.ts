@@ -49,9 +49,12 @@ const installFakeWindow = (posts: string[]) => {
   }
 }
 
-const createTestEnvironment = (platform: string) => {
+const createTestEnvironment = (platform: string, ancestorOrigin?: string) => {
   const posts: string[] = []
   const { fakeWindow, restore } = installFakeWindow(posts)
+  if (ancestorOrigin !== undefined) {
+    fakeWindow.location = { ancestorOrigins: [ancestorOrigin] }
+  }
   const disposer = createDisposer()
   const abortController = new AbortController()
   const protocol = createProtocol({
@@ -145,7 +148,7 @@ describe("createViewport", () => {
     }
   })
 
-  it("requests the viewport on macOS and finishes when the null payload arrives", async () => {
+  it("mounts macOS without requesting the null viewport", async () => {
     const environment = createTestEnvironment("macos")
     try {
       const viewport = createViewport(environment.runtime, {
@@ -153,33 +156,21 @@ describe("createViewport", () => {
         isFullscreen: false,
       })
 
-      let isMounted = false
-      const mountTracking = (async () => {
-        await viewport.mount()
-        isMounted = true
-      })()
-      await flushMicrotasks()
+      await viewport.mount()
 
-      expect(isMounted).toBe(false)
-      expect(environment.posts).toEqual(["web_app_request_viewport"])
-
-      environment.emit("viewport_changed", null)
-      await mountTracking
-
-      expect(isMounted).toBe(true)
       expect(viewport.store.get().height).toBe(800)
       expect(viewport.store.get().isExpanded).toBe(true)
-      expect(environment.posts).toEqual(["web_app_request_viewport", "web_app_request_safe_area"])
+      expect(environment.posts).toEqual(["web_app_request_safe_area"])
     } finally {
       environment.restoreWindow()
     }
   })
 
   it("mounts Web K without requesting a viewport it never answers", async () => {
-    const environment = createTestEnvironment("webk")
+    const environment = createTestEnvironment("web", "https://webk.telegram.org")
     try {
       const viewport = createViewport(environment.runtime, {
-        platform: "webk",
+        platform: "web",
         isFullscreen: false,
       })
 

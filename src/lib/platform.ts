@@ -16,16 +16,16 @@ const unknownPlatform: PlatformDefinition = {
   isEmbeddedWeb: false,
 }
 
-// `supportsViewport` records whether the client answers
-// `web_app_request_viewport`. Mobile clients report a measured viewport.
-// Desktop macOS answers with a null payload; Telegram Desktop measures its layout.
-// Unigram and the embedded web clients never answer, so waiting on them stalls mount.
+// `supportsViewport` records whether the client provides a usable viewport height.
+// Mobile clients report a measured viewport. Telegram Desktop measures its layout.
+// The macOS client answers with a null payload, so it has no usable height.
+// Unigram and the embedded web clients never answer; waiting stalls mount.
 // `android_x` and `unigram` are legacy aliases.
 const platformTable = new Map<string, PlatformDefinition>([
   ["ios", { kind: "mobile", supportsViewport: true, isEmbeddedWeb: false }],
   ["android", { kind: "mobile", supportsViewport: true, isEmbeddedWeb: false }],
   ["android_x", { kind: "mobile", supportsViewport: true, isEmbeddedWeb: false }],
-  ["macos", { kind: "desktop", supportsViewport: true, isEmbeddedWeb: false }],
+  ["macos", { kind: "desktop", supportsViewport: false, isEmbeddedWeb: false }],
   ["tdesktop", { kind: "desktop", supportsViewport: true, isEmbeddedWeb: false }],
   ["windows", { kind: "desktop", supportsViewport: false, isEmbeddedWeb: false }],
   ["unigram", { kind: "desktop", supportsViewport: false, isEmbeddedWeb: false }],

@@ -6,4 +6,4 @@ Replace the platform boolean with a capability table. `getPlatform(name)` report
 
 Breaking release (0.3.0):
 
-- `isDesktopPlatform` is removed; read `getPlatform(name).kind` or `getPlatform(name).supportsViewport` instead.
+- `isDesktopPlatform` is removed. Read `getPlatform(name).kind` for the client class (`mobile`, `desktop`, `web` or `unknown`), and `getPlatform(name).supportsViewport` for whether the client provides a usable viewport height. The old desktop layout set is `kind === "desktop" || kind === "web"`. macOS no longer requests the null viewport and uses the window height.

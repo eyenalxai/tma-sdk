@@ -36,9 +36,9 @@ _Avoid_: method registry, wire map
 The layer that sends protocol messages over the native proxy, the legacy `window.external.notify` channel or the iframe `postMessage` channel, and installs the inbound receive-event globals.
 _Avoid_: bridge, post-event
 
-**Capability**:
+**Method capability**:
 The tri-state answer for whether a Telegram method is available: `supported`, `unsupported` or `unknown`. Only hard evidence produces `unsupported`.
-_Avoid_: support flag, feature flag
+_Avoid_: support flag, feature flag, capability (ambiguous with platform capability)
 
 **Telegram method**:
 A command a Mini App sends to the Telegram client over the Telegram event bridge.
@@ -62,9 +62,9 @@ _Avoid_: module, service, manager
 The identifier of the Telegram client that launched the Mini App, reported in launch parameters (for example `ios`, `android`, `tdesktop`, `windows`, `web`).
 _Avoid_: device type, operating system
 
-**Desktop platform**:
-A platform whose client lays out the Mini App without resizing its viewport, so viewport state stays stable.
-_Avoid_: non-mobile platform, desktop client
+**Platform capability**:
+The client-dependent behavior a Mini App reads from the launch platform: the platform kind (`mobile`, `desktop`, `web` or `unknown`), whether the client provides a usable viewport height, and whether it is an embedded web client.
+_Avoid_: desktop flag, platform boolean
 
 **Viewport state**:
 The Mini App window state observed by a session: height, stable height, expansion, fullscreen, and safe area insets.

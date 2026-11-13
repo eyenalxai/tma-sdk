@@ -15,7 +15,7 @@ const platformCases: readonly PlatformCase[] = [
   ["ios", "mobile", true, false],
   ["android", "mobile", true, false],
   ["android_x", "mobile", true, false],
-  ["macos", "desktop", true, false],
+  ["macos", "desktop", false, false],
   ["tdesktop", "desktop", true, false],
   ["unigram", "desktop", false, false],
   ["windows", "desktop", false, false],
