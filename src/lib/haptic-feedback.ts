@@ -1,7 +1,8 @@
-import type { HapticFeedbackParams } from "./protocol/methods"
-import type { TelegramRuntime } from "./telegram-runtime"
+import type { HapticFeedbackParams } from "#lib/protocol/methods"
 
-import { invokeBestEffort } from "./protocol/client"
+import { invokeBestEffort } from "#lib/protocol/client"
+
+import type { TelegramRuntime } from "./telegram-runtime"
 
 type ImpactHapticFeedbackStyle = Extract<HapticFeedbackParams, { type: "impact" }>["impact_style"]
 type NotificationHapticFeedbackType = Extract<
@@ -18,7 +19,7 @@ type HapticFeedback = {
 
 const createHapticFeedback = (runtime: TelegramRuntime): HapticFeedback => {
   const { protocol } = runtime
-  const isSupported = protocol.supports("web_app_trigger_haptic_feedback") !== "unsupported"
+  const isSupported = protocol.canInvoke("web_app_trigger_haptic_feedback")
 
   const trigger = (params: HapticFeedbackParams) => {
     if (isSupported) {

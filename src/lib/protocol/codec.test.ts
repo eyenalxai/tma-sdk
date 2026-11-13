@@ -31,6 +31,7 @@ describe("encodeMethod", () => {
   it("uses the table wire name for every row", () => {
     for (const [method, definition] of Object.entries(methodTable)) {
       const params = "raw" in definition && definition.raw ? "" : undefined
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       const message = encodeMethod(method as never, params as never)
       expect(message.eventType).toBe(method)
     }
@@ -79,23 +80,25 @@ describe("parseEventPayload", () => {
     ).toEqual({ height: 640, is_state_stable: true, is_expanded: false })
   })
 
-  it("falls back to window dimensions for a null viewport payload", () => {
+  it("falls back to the injected protocol window for a null viewport payload", () => {
     // Telegram for macOS sends a null viewport payload.
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: { innerHeight: 480, innerWidth: 320 },
+    expect(
+      parseEventPayload("viewport_changed", null, { innerHeight: 480, innerWidth: 320 }),
+    ).toEqual({
+      height: 480,
+      width: 320,
+      is_state_stable: true,
+      is_expanded: true,
     })
+  })
 
-    try {
-      expect(parseEventPayload("viewport_changed", null)).toEqual({
-        height: 480,
-        width: 320,
-        is_state_stable: true,
-        is_expanded: true,
-      })
-    } finally {
-      Reflect.deleteProperty(globalThis, "window")
-    }
+  it("parses a null viewport payload outside a browser", () => {
+    expect(parseEventPayload("viewport_changed", null)).toEqual({
+      height: 0,
+      width: 0,
+      is_state_stable: true,
+      is_expanded: true,
+    })
   })
 
   it("accepts the boolean strings macOS sends for biometry info", () => {

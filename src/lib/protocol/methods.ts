@@ -64,23 +64,36 @@ const safeAreaInsetsSchema = z.looseObject({
 
 type SafeAreaInsets = z.output<typeof safeAreaInsetsSchema>
 
-const viewportChangedEventSchema = z
-  .looseObject({
-    height: z.number(),
-    width: z.number().optional(),
-    is_state_stable: z.boolean(),
-    is_expanded: z.boolean(),
-  })
-  .nullable()
-  .transform(
-    (value) =>
-      value ?? {
-        height: window.innerHeight,
-        width: window.innerWidth,
-        is_state_stable: true,
-        is_expanded: true,
-      },
-  )
+const viewportChangedEventSchema = z.looseObject({
+  height: z.number(),
+  width: z.number().optional(),
+  is_state_stable: z.boolean(),
+  is_expanded: z.boolean(),
+})
+
+type ViewportFallbackWindow = {
+  readonly innerHeight?: unknown
+  readonly innerWidth?: unknown
+}
+
+const readWindowDimension = (
+  browserWindow: ViewportFallbackWindow | undefined,
+  key: "innerHeight" | "innerWidth",
+): number => {
+  const value = browserWindow?.[key]
+  return typeof value === "number" && Number.isFinite(value) ? value : 0
+}
+
+// Telegram for macOS sends a null viewport payload; use the injected window.
+// Outside a browser the fallback stays pure.
+const viewportFallback = (browserWindow?: ViewportFallbackWindow): object => {
+  return {
+    height: readWindowDimension(browserWindow, "innerHeight"),
+    width: readWindowDimension(browserWindow, "innerWidth"),
+    is_state_stable: true,
+    is_expanded: true,
+  }
+}
 
 const themeChangedEventSchema = z.looseObject({
   theme_params: z.record(z.string(), z.string()),
@@ -225,14 +238,6 @@ const storageFailedEventSchema = z.looseObject({
   error: z.string(),
 })
 
-const mediaAccessEventSchema = z.looseObject({
-  available: z.boolean().optional(),
-  access_requested: z.boolean().optional(),
-  access_granted: z.boolean().optional(),
-  camera: z.boolean().optional(),
-  microphone: z.boolean().optional(),
-})
-
 const eventTable = {
   accelerometer_changed: {
     schema: sensorChangedEventSchema,
@@ -353,39 +358,6 @@ const eventTable = {
   location_checked: { schema: locationCheckedEventSchema, since: "8.0" },
   location_requested: { schema: locationRequestedEventSchema, since: "8.0" },
   main_button_pressed: { schema: payloadlessEventSchema, since: "6.0" },
-  media_access_changed: {
-    schema: mediaAccessEventSchema,
-    since: "6.0",
-    platforms: {
-      ios: "unsupported",
-      android: "unsupported",
-      macos: "unsupported",
-      tdesktop: "unsupported",
-      windows: "unsupported",
-    },
-  },
-  media_access_checked: {
-    schema: mediaAccessEventSchema,
-    since: "6.0",
-    platforms: {
-      ios: "unsupported",
-      android: "unsupported",
-      macos: "unsupported",
-      tdesktop: "unsupported",
-      windows: "unsupported",
-    },
-  },
-  media_access_requested: {
-    schema: mediaAccessEventSchema,
-    since: "6.0",
-    platforms: {
-      ios: "unsupported",
-      android: "unsupported",
-      macos: "unsupported",
-      tdesktop: "unsupported",
-      windows: "unsupported",
-    },
-  },
   phone_requested: { schema: phoneRequestedEventSchema, since: "6.9" },
   popup_closed: { schema: popupClosedEventSchema, since: "6.2" },
   prepared_message_failed: { schema: preparedMessageFailedEventSchema, since: "8.0" },
@@ -466,6 +438,7 @@ const eventTable = {
     schema: viewportChangedEventSchema,
     since: "6.0",
     platforms: { webk: "unsupported" },
+    fallback: viewportFallback,
   },
   visibility_changed: {
     schema: z.looseObject({ is_visible: z.boolean() }),
@@ -474,7 +447,12 @@ const eventTable = {
   write_access_requested: { schema: writeAccessRequestedEventSchema, since: "6.9" },
 } as const satisfies Record<
   string,
-  { schema: z.ZodType; since: string; platforms?: PlatformCapabilities }
+  {
+    schema: z.ZodType
+    since: string
+    platforms?: PlatformCapabilities
+    fallback?: (browserWindow?: ViewportFallbackWindow) => unknown
+  }
 >
 
 type EventName = keyof typeof eventTable
@@ -610,8 +588,6 @@ type MethodParamsMap = {
   web_app_start_gyroscope: { refresh_rate?: number }
   web_app_stop_gyroscope: undefined
   web_app_invoke_custom_method: { req_id: string; method: string; params?: unknown }
-  web_app_request_media_access: { camera: boolean; microphone: boolean }
-  web_app_check_media_access: { shim_installed: boolean }
   web_app_device_storage_save_key: { req_id: string; key: string; value: string | null }
   web_app_device_storage_get_key: { req_id: string; key: string }
   web_app_device_storage_clear: { req_id: string }
@@ -635,6 +611,7 @@ type MethodDefinition = {
   since: string
   raw?: boolean
   platforms?: PlatformCapabilities
+  paramVersions?: Readonly<Record<string, string>>
 }
 
 const unsupportedOnDesktop: PlatformCapabilities = {
@@ -679,7 +656,11 @@ const methodTable = {
   // The public payload is a raw string; the wire wraps it in `{data}`.
   web_app_data_send: { events: [], since: "6.0", raw: true },
   web_app_switch_inline_query: { events: [], since: "6.7" },
-  web_app_open_link: { events: [], since: "6.1" },
+  web_app_open_link: {
+    events: [],
+    since: "6.1",
+    paramVersions: { try_browser: "7.6", try_instant_view: "6.4" },
+  },
   web_app_open_tg_link: { events: [], since: "6.1" },
   web_app_open_invoice: { events: ["invoice_closed"], since: "6.1" },
   web_app_setup_main_button: { events: [], since: "6.0" },
@@ -692,7 +673,11 @@ const methodTable = {
     since: "7.7",
     platforms: { ...unsupportedOnDesktop, ...unsupportedOnWebK },
   },
-  web_app_set_header_color: { events: [], since: "6.1" },
+  web_app_set_header_color: {
+    events: [],
+    since: "6.1",
+    paramVersions: { color: "6.9" },
+  },
   web_app_set_background_color: { events: [], since: "6.1" },
   web_app_set_bottom_bar_color: { events: [], since: "7.10" },
   web_app_trigger_haptic_feedback: {
@@ -846,16 +831,6 @@ const methodTable = {
     events: ["custom_method_invoked"],
     since: "6.9",
   },
-  web_app_request_media_access: {
-    events: ["media_access_requested"],
-    since: "6.0",
-    platforms: unsupportedOnNative,
-  },
-  web_app_check_media_access: {
-    events: ["media_access_checked"],
-    since: "6.0",
-    platforms: unsupportedOnNative,
-  },
   web_app_verify_age: { events: [], since: "8.0" },
   web_app_device_storage_save_key: {
     events: ["device_storage_key_saved", "device_storage_failed"],
@@ -910,6 +885,15 @@ const supports = (method: Method, platform: string, version: string): Capability
   return compareVersions(version, definition.since) >= 0 ? "supported" : "unknown"
 }
 
+/**
+ * Reports whether a parameter that appeared after its method is available.
+ * Parameters without a recorded version follow the method's availability.
+ */
+const supportsParam = (method: Method, param: string, version: string): boolean => {
+  const since = methodDefinitions[method].paramVersions?.[param]
+  return since === undefined || compareVersions(version, since) >= 0
+}
+
 export {
   compareVersions,
   eventTable,
@@ -919,6 +903,7 @@ export {
   methodTable,
   normalizePlatform,
   supports,
+  supportsParam,
   type Capability,
   type EventName,
   type EventPayloads,

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test"
 
-import type { ProtocolWindow } from "./protocol/transport"
+import type { ProtocolWindow } from "#lib/protocol/transport"
+
+import { createProtocol } from "#lib/protocol/client"
+
 import type { TelegramRuntime } from "./telegram-runtime"
 
 import { createDisposer } from "./disposer"
-import { createProtocol } from "./protocol/client"
 import { createViewport } from "./viewport"
 
 const flushMicrotasks = async (): Promise<void> => {
@@ -74,6 +76,7 @@ const createTestEnvironment = (platform: string) => {
       disposer.dispose()
     },
     emit: (eventType: string, eventData?: unknown) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       const receive = fakeWindow.TelegramGameProxy_receiveEvent as (
         eventType: string,
         eventData?: unknown,

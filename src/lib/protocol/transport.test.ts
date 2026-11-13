@@ -1,26 +1,11 @@
+/* oxlint-disable max-lines */
 import { describe, expect, it } from "bun:test"
 
+import type { NativePost } from "./test-support"
+
 import { createProtocol } from "./client"
+import { createNativeWindow } from "./test-support"
 import { createTransport } from "./transport"
-
-type NativePost = { eventType: string; eventData: string }
-
-const createNativeWindow = () => {
-  const posts: NativePost[] = []
-  const browserWindow: Record<PropertyKey, unknown> = {
-    TelegramWebviewProxy: {
-      postEvent: (eventType: string, eventData: string) => {
-        posts.push({ eventType, eventData })
-      },
-    },
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }
-  browserWindow.self = browserWindow
-  browserWindow.top = browserWindow
-  browserWindow.parent = browserWindow
-  return { browserWindow, posts }
-}
 
 type IframeWindowOptions = {
   ancestorOrigin?: string | null
@@ -76,6 +61,7 @@ const parentMessage = (source: unknown, data: unknown, origin: string): MessageE
     origin,
     source,
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   return message as MessageEvent
 }
 
@@ -94,14 +80,18 @@ describe("transport", () => {
 
     expect(posts).toEqual([{ eventType: "web_app_ready", eventData: '""' }])
 
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const gameProxy = browserWindow.TelegramGameProxy as {
       receiveEvent: (eventType: string, eventData?: unknown) => void
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const webView = (browserWindow.Telegram as { WebView: Record<string, unknown> }).WebView
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const receiveGlobal = browserWindow.TelegramGameProxy_receiveEvent as (
       eventType: string,
       eventData?: unknown,
     ) => void
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const receiveWebView = webView.receiveEvent as (eventType: string, eventData?: unknown) => void
 
     receiveGlobal("back_button_pressed", null)
@@ -217,6 +207,49 @@ describe("transport", () => {
 
     expect(received).toEqual([{ height: 640, is_state_stable: true, is_expanded: true }])
     protocol.destroy()
+  })
+
+  it("applies the Web K gaps to platform web on the webk host", () => {
+    const { browserWindow, messages } = createIframeWindow({
+      ancestorOrigin: "https://webk.telegram.org",
+    })
+    const protocol = createProtocol({ platform: "web", version: "9.0", window: browserWindow })
+
+    expect(protocol.supports("web_app_request_viewport")).toBe("unsupported")
+    expect(protocol.canInvoke("web_app_request_viewport")).toBe(false)
+    expect(() => {
+      protocol.invoke("web_app_request_viewport")
+    }).toThrow('Method "web_app_request_viewport" is not supported')
+
+    protocol.invoke("web_app_ready")
+
+    expect(messages).toEqual([
+      {
+        message: '{"eventType":"web_app_ready","eventData":""}',
+        targetOrigin: "https://webk.telegram.org",
+      },
+    ])
+    protocol.destroy()
+  })
+
+  it("does not apply the Web K gaps to platform web on the web host", () => {
+    const { browserWindow } = createIframeWindow({
+      ancestorOrigin: "https://web.telegram.org",
+    })
+    const protocol = createProtocol({ platform: "web", version: "9.0", window: browserWindow })
+
+    expect(protocol.supports("web_app_request_viewport")).toBe("supported")
+    protocol.destroy()
+  })
+
+  it("refuses an origin that is not allowlisted instead of falling back to *", () => {
+    const { browserWindow } = createIframeWindow({
+      ancestorOrigin: "https://evil.example",
+    })
+
+    expect(() => createTransport(browserWindow)).toThrow(
+      'Unable to send Telegram events: "https://evil.example" is not an allowlisted Telegram Web origin',
+    )
   })
 
   it("falls back to * only with a source check", () => {

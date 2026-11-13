@@ -12,8 +12,14 @@ import type {
 import type { ProtocolWindow, TelegramEventSink } from "./transport"
 
 import { encodeMethod, parseEventPayload } from "./codec"
-import { isEventName, methodTable, supports as getCapability } from "./methods"
-import { createTransport, getBrowserWindow, installInboundBridge } from "./transport"
+import { createAbortError, ProtocolTimeoutError, UnsupportedMethodError } from "./errors"
+import {
+  isEventName,
+  methodTable,
+  supports as getCapability,
+  supportsParam as getParamCapability,
+} from "./methods"
+import { createTransport, getBrowserWindow, installInboundBridge, isWebKWindow } from "./transport"
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
@@ -46,6 +52,8 @@ type Protocol = {
   request: Request
   on: On
   supports: (method: Method) => Capability
+  canInvoke: (method: Method) => boolean
+  supportsParam: (method: Method, param: string) => boolean
   readonly isFramed: boolean
   destroy: () => void
 }
@@ -58,65 +66,17 @@ type CreateProtocolOptions = {
   defaultTimeout?: number
 }
 
-type ProtocolErrorOptions = {
-  method: Method
-  platform: string
-  version: string
-}
-
-class UnsupportedMethodError extends Error {
-  readonly method: Method
-  readonly platform: string
-  readonly version: string
-
-  constructor(options: ProtocolErrorOptions) {
-    super(`Method "${options.method}" is not supported on ${options.platform} ${options.version}`)
-    this.name = "UnsupportedMethodError"
-    this.method = options.method
-    this.platform = options.platform
-    this.version = options.version
-  }
-}
-
-type ProtocolTimeoutErrorOptions = ProtocolErrorOptions & {
-  events: readonly EventName[]
-  timeout: number
-}
-
-class ProtocolTimeoutError extends Error {
-  readonly method: Method
-  readonly platform: string
-  readonly version: string
-  readonly events: readonly EventName[]
-  readonly timeout: number
-
-  constructor(options: ProtocolTimeoutErrorOptions) {
-    super(
-      `Request "${options.method}" timed out after ${options.timeout}ms on ` +
-        `${options.platform} ${options.version} waiting for events: ${options.events.join(", ")}`,
-    )
-    this.name = "ProtocolTimeoutError"
-    this.method = options.method
-    this.platform = options.platform
-    this.version = options.version
-    this.events = options.events
-    this.timeout = options.timeout
-  }
-}
-
-const createAbortError = (method: Method): Error => {
-  const error = new Error(`Request "${method}" was aborted`)
-  error.name = "AbortError"
-  return error
-}
-
 const createProtocol = (options: CreateProtocolOptions): Protocol => {
   const { platform, version, signal, defaultTimeout = DEFAULT_TIMEOUT_MS } = options
   const browserWindow = options.window ?? getBrowserWindow()
+  // Web K reports `web` in launch parameters; the host is the reliable signal.
+  const capabilityPlatform = platform === "web" && isWebKWindow(browserWindow) ? "webk" : platform
   const transport = createTransport(browserWindow)
   const handlerSets = new Map<EventName, Set<(payload: unknown) => void>>()
   const disposer = createDisposer()
   let isDestroyed = false
+  const getCapabilityFor = (method: Method): Capability =>
+    getCapability(method, capabilityPlatform, version)
 
   const receive: TelegramEventSink = (eventType, eventData) => {
     if (!isEventName(eventType)) {
@@ -129,7 +89,7 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
 
     let payload: EventPayloads[EventName] | null = null
     try {
-      payload = parseEventPayload(eventType, eventData)
+      payload = parseEventPayload(eventType, eventData, browserWindow)
     } catch (error) {
       console.error(`[Telegram] Failed to parse "${eventType}" event payload`, eventData, error)
       return
@@ -146,7 +106,7 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
     if (isDestroyed) {
       throw new Error("Cannot invoke a method on a destroyed protocol")
     }
-    const capability = getCapability(method, platform, version)
+    const capability = getCapabilityFor(method)
     if (capability === "unsupported") {
       throw new UnsupportedMethodError({ method, platform, version })
     }
@@ -277,7 +237,9 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
     invoke,
     request,
     on,
-    supports: (method) => getCapability(method, platform, version),
+    supports: getCapabilityFor,
+    canInvoke: (method) => getCapabilityFor(method) !== "unsupported",
+    supportsParam: (method, param) => getParamCapability(method, param, version),
     isFramed: transport.isFramed,
     destroy: () => {
       if (isDestroyed) {

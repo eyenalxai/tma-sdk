@@ -1,7 +1,8 @@
+import { invokeBestEffort } from "#lib/protocol/client"
+
 import type { Store } from "./store"
 import type { TelegramRuntime } from "./telegram-runtime"
 
-import { invokeBestEffort } from "./protocol/client"
 import { createStore } from "./store"
 
 type BackButtonState = {
@@ -18,7 +19,7 @@ type BackButton = {
 
 const createBackButton = (runtime: TelegramRuntime): BackButton => {
   const { protocol } = runtime
-  const isSupported = protocol.supports("web_app_setup_back_button") !== "unsupported"
+  const isSupported = protocol.canInvoke("web_app_setup_back_button")
   const store = createStore<BackButtonState>({ isVisible: false })
 
   const setVisible = (isVisible: boolean) => {

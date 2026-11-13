@@ -1,6 +1,6 @@
-import type { TelegramRuntime } from "./telegram-runtime"
+import { invokeBestEffort } from "#lib/protocol/client"
 
-import { invokeBestEffort } from "./protocol/client"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 type SwipeBehavior = {
   isSupported: boolean
@@ -10,7 +10,7 @@ type SwipeBehavior = {
 
 const createSwipeBehavior = (runtime: TelegramRuntime): SwipeBehavior => {
   const { protocol } = runtime
-  const isSupported = protocol.supports("web_app_setup_swipe_behavior") !== "unsupported"
+  const isSupported = protocol.canInvoke("web_app_setup_swipe_behavior")
 
   const setVerticalEnabled = (enabled: boolean) => {
     if (isSupported) {

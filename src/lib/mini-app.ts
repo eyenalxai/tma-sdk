@@ -1,6 +1,6 @@
-import type { TelegramRuntime } from "./telegram-runtime"
+import { invokeBestEffort } from "#lib/protocol/client"
 
-import { invokeBestEffort } from "./protocol/client"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 type MiniApp = {
   ready: () => void
@@ -10,7 +10,7 @@ type MiniApp = {
 
 const createMiniApp = (runtime: TelegramRuntime): MiniApp => {
   const { protocol } = runtime
-  const isReadySupported = protocol.supports("web_app_ready") !== "unsupported"
+  const isReadySupported = protocol.canInvoke("web_app_ready")
 
   return {
     ready: () => {
@@ -19,7 +19,10 @@ const createMiniApp = (runtime: TelegramRuntime): MiniApp => {
       }
     },
     setHeaderColor: (color) => {
-      invokeBestEffort(protocol, "web_app_set_header_color", { color })
+      // RGB header colors require Mini Apps 6.9+.
+      if (protocol.supportsParam("web_app_set_header_color", "color")) {
+        invokeBestEffort(protocol, "web_app_set_header_color", { color })
+      }
     },
     setBgColor: (color) => {
       invokeBestEffort(protocol, "web_app_set_background_color", { color })

@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines */
 import { describe, expect, it, spyOn } from "bun:test"
 
 import {
@@ -6,32 +7,7 @@ import {
   ProtocolTimeoutError,
   UnsupportedMethodError,
 } from "./client"
-
-const createNativeWindow = () => {
-  const posts: { eventType: string; eventData: string }[] = []
-  const browserWindow: Record<PropertyKey, unknown> = {
-    TelegramWebviewProxy: {
-      postEvent: (eventType: string, eventData: string) => {
-        posts.push({ eventType, eventData })
-      },
-    },
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }
-  browserWindow.self = browserWindow
-  browserWindow.top = browserWindow
-  browserWindow.parent = browserWindow
-
-  const emit = (eventType: string, eventData?: unknown): void => {
-    const receive = browserWindow.TelegramGameProxy_receiveEvent as (
-      eventType: string,
-      eventData?: unknown,
-    ) => void
-    receive(eventType, eventData)
-  }
-
-  return { browserWindow, posts, emit }
-}
+import { createNativeWindow } from "./test-support"
 
 const catchFailure = async (promise: Promise<unknown>): Promise<unknown> => {
   try {

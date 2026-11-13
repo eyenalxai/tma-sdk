@@ -1,10 +1,13 @@
+import type { Protocol } from "#lib/protocol/client"
+
+import { createProtocol, invokeBestEffort } from "#lib/protocol/client"
+
 import type { BackButton } from "./back-button"
 import type { HapticFeedback } from "./haptic-feedback"
 import type { InitData } from "./init-data"
 import type { LaunchParams } from "./launch-params"
 import type { OpenLinkOptions } from "./links"
 import type { MiniApp } from "./mini-app"
-import type { Protocol } from "./protocol/client"
 import type { WriteAccessStatus } from "./request-write-access"
 import type { SwipeBehavior } from "./swipe-behavior"
 import type { TelegramRuntime } from "./telegram-runtime"
@@ -18,7 +21,6 @@ import { parseInitData } from "./init-data"
 import { retrieveLaunchParams } from "./launch-params"
 import { createOpenLink, createOpenTelegramLink } from "./links"
 import { createMiniApp } from "./mini-app"
-import { createProtocol, invokeBestEffort } from "./protocol/client"
 import { createRequestWriteAccess } from "./request-write-access"
 import { createSwipeBehavior } from "./swipe-behavior"
 import { createViewport } from "./viewport"
@@ -99,7 +101,7 @@ const createTelegramSession = (): TelegramSession => {
     )
 
     // Notify Telegram that the iframe is ready, enabling style and reload events.
-    if (protocol.isFramed && protocol.supports("iframe_ready") !== "unsupported") {
+    if (protocol.isFramed && protocol.canInvoke("iframe_ready")) {
       protocol.invoke("iframe_ready", { reload_supported: true })
     }
   } catch (error) {

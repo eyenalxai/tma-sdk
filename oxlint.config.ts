@@ -196,22 +196,15 @@ const ignorePatterns = [
   "**/*.config.{js,ts,mjs,cjs}",
   "**/tsconfig.tsbuildinfo",
   ".changeset/**",
-  "docs/**",
+  "docs/research/vendor/**",
 ]
 
 const overrides: OxlintConfig["overrides"] = [
   {
-    files: ["src/lib/protocol/**/*.ts"],
+    files: ["src/lib/protocol/methods.ts"],
     rules: {
       // The protocol table is one source of truth and is intentionally long.
       "max-lines": "off",
-    },
-  },
-  {
-    files: ["src/**/*.test.ts"],
-    rules: {
-      // Tests fake browser globals and narrow them at the boundary.
-      "typescript/no-unsafe-type-assertion": "off",
     },
   },
 ]

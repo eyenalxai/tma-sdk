@@ -1,6 +1,6 @@
-import type { TelegramRuntime } from "./telegram-runtime"
+import { USER_CONFIRMATION_TIMEOUT_MS } from "#lib/protocol/client"
 
-import { USER_CONFIRMATION_TIMEOUT_MS } from "./protocol/client"
+import type { TelegramRuntime } from "./telegram-runtime"
 
 type WriteAccessStatus = "allowed" | "cancelled"
 
@@ -12,7 +12,7 @@ type WriteAccessStatus = "allowed" | "cancelled"
 const createRequestWriteAccess =
   (runtime: TelegramRuntime) => async (): Promise<WriteAccessStatus> => {
     const { protocol } = runtime
-    if (protocol.supports("web_app_request_write_access") === "unsupported") {
+    if (!protocol.canInvoke("web_app_request_write_access")) {
       throw new Error("Write access requests are not supported in this Telegram version")
     }
 

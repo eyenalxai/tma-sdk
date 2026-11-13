@@ -74,22 +74,51 @@ const parseOrigin = (value: string): string | null => {
 }
 
 /**
- * Web K is served from `webk.telegram.org` as well as `web.telegram.org`.
- * The parent origin is used when it is one of the allowlisted Telegram Web
- * origins; otherwise the transport falls back to `*` and the source check in
- * the inbound bridge is the only gate.
+ * Returns the first origin the page knows: the parent origin when the browser
+ * exposes it, otherwise the referrer. `null` means neither is available.
+ */
+const readPresentOrigin = (browserWindow: ProtocolWindow): string | null => {
+  const ancestorOrigin = readAncestorOrigin(browserWindow)
+  if (ancestorOrigin !== null && ancestorOrigin !== "") {
+    return ancestorOrigin
+  }
+  const referrer = readReferrer(browserWindow)
+  if (referrer !== null && referrer !== "") {
+    return referrer
+  }
+  return null
+}
+
+/**
+ * The iframe target is one of the allowlisted Telegram Web origins. A page that
+ * exposes a different origin is refused instead of falling back to `*`; the
+ * wildcard is only for pages where neither the ancestor nor the referrer is
+ * available.
  */
 const resolveTargetOrigin = (browserWindow: ProtocolWindow): string => {
-  for (const candidate of [readAncestorOrigin(browserWindow), readReferrer(browserWindow)]) {
-    if (candidate === null || candidate === "") {
-      continue
-    }
-    const origin = parseOrigin(candidate)
-    if (origin !== null && TELEGRAM_WEB_ORIGINS.has(origin)) {
-      return origin
-    }
+  const candidate = readPresentOrigin(browserWindow)
+  if (candidate === null) {
+    return "*"
   }
-  return "*"
+  const origin = parseOrigin(candidate)
+  if (origin !== null && TELEGRAM_WEB_ORIGINS.has(origin)) {
+    return origin
+  }
+  throw new Error(
+    `Unable to send Telegram events: "${candidate}" is not an allowlisted Telegram Web origin`,
+  )
+}
+
+/**
+ * Web K launch parameters report the platform as `web`, so the host is the only
+ * reliable signal. It is served from `webk.telegram.org`, not `web.telegram.org`.
+ */
+const isWebKWindow = (browserWindow: ProtocolWindow): boolean => {
+  const candidate = readPresentOrigin(browserWindow)
+  if (candidate === null) {
+    return false
+  }
+  return parseOrigin(candidate) === "https://webk.telegram.org"
 }
 
 const getParentTarget = (browserWindow: ProtocolWindow): MessageTarget => {
@@ -260,6 +289,7 @@ export {
   createTransport,
   getBrowserWindow,
   installInboundBridge,
+  isWebKWindow,
   type ProtocolWindow,
   type TelegramEventSink,
 }

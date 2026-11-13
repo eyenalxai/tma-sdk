@@ -1,5 +1,6 @@
+import type { Protocol } from "#lib/protocol/client"
+
 import type { Disposer } from "./disposer"
-import type { Protocol } from "./protocol/client"
 
 type TelegramRuntime = {
   protocol: Protocol

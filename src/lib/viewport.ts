@@ -1,9 +1,11 @@
-import type { SafeAreaInsets } from "./protocol/methods"
+import type { SafeAreaInsets } from "#lib/protocol/methods"
+
+import { invokeBestEffort } from "#lib/protocol/client"
+
 import type { Store } from "./store"
 import type { TelegramRuntime } from "./telegram-runtime"
 
 import { isDesktopPlatform } from "./platform"
-import { invokeBestEffort } from "./protocol/client"
 import { createStore } from "./store"
 import { bindViewportCssVariables } from "./viewport-css-vars"
 
@@ -45,7 +47,7 @@ const createViewport = (
 ): Viewport => {
   const { protocol } = runtime
   const { platform } = options
-  const isFullscreenSupported = protocol.supports("web_app_request_fullscreen") !== "unsupported"
+  const isFullscreenSupported = protocol.canInvoke("web_app_request_fullscreen")
   const initialViewportRequestTimeoutMs = 5000
 
   const store = createStore<ViewportState>({
@@ -85,10 +87,7 @@ const createViewport = (
       }),
     )
 
-    if (
-      isDesktopPlatform(platform) ||
-      protocol.supports("web_app_request_viewport") === "unsupported"
-    ) {
+    if (isDesktopPlatform(platform) || !protocol.canInvoke("web_app_request_viewport")) {
       store.update({ isExpanded: true })
     } else {
       try {
@@ -109,10 +108,10 @@ const createViewport = (
 
     // Best-effort: Web K and Unigram never answer these requests. Mount must not stall on them.
     // Telegram for macOS answers the content safe-area request with `safe_area_changed` instead.
-    if (protocol.supports("web_app_request_safe_area") !== "unsupported") {
+    if (protocol.canInvoke("web_app_request_safe_area")) {
       invokeBestEffort(protocol, "web_app_request_safe_area")
     }
-    if (protocol.supports("web_app_request_content_safe_area") !== "unsupported") {
+    if (protocol.canInvoke("web_app_request_content_safe_area")) {
       invokeBestEffort(protocol, "web_app_request_content_safe_area")
     }
   }
@@ -147,7 +146,7 @@ const createViewport = (
       return mountPromise
     },
     expand: () => {
-      if (protocol.supports("web_app_expand") !== "unsupported") {
+      if (protocol.canInvoke("web_app_expand")) {
         invokeBestEffort(protocol, "web_app_expand")
       }
     },
