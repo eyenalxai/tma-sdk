@@ -131,7 +131,10 @@ const getParentTarget = (browserWindow: ProtocolWindow): MessageTarget => {
 
 const createTransport = (browserWindow: ProtocolWindow = getBrowserWindow()): Transport => {
   const isFramed = isIframe(browserWindow)
-  const targetOrigin = isFramed ? resolveTargetOrigin(browserWindow) : null
+  const hasNativeTransport =
+    isPostEventProxy(browserWindow.TelegramWebviewProxy) || isNotifyProxy(browserWindow.external)
+  // Resolve the parent origin only for the iframe path; a native proxy takes precedence.
+  const targetOrigin = isFramed && !hasNativeTransport ? resolveTargetOrigin(browserWindow) : null
 
   return {
     isFramed,
@@ -152,9 +155,10 @@ const createTransport = (browserWindow: ProtocolWindow = getBrowserWindow()): Tr
       }
 
       if (isIframe(browserWindow)) {
+        const origin = targetOrigin ?? resolveTargetOrigin(browserWindow)
         getParentTarget(browserWindow).postMessage(
           JSON.stringify({ eventType: message.eventType, eventData: message.eventData }),
-          targetOrigin ?? "*",
+          origin,
         )
         return
       }

@@ -101,7 +101,7 @@ const createTelegramSession = (): TelegramSession => {
     )
 
     // Notify Telegram that the iframe is ready, enabling style and reload events.
-    if (protocol.isFramed && protocol.canInvoke("iframe_ready")) {
+    if (protocol.isFramed && protocol.mayInvoke("iframe_ready")) {
       protocol.invoke("iframe_ready", { reload_supported: true })
     }
   } catch (error) {

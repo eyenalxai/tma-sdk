@@ -12,7 +12,7 @@ type WriteAccessStatus = "allowed" | "cancelled"
 const createRequestWriteAccess =
   (runtime: TelegramRuntime) => async (): Promise<WriteAccessStatus> => {
     const { protocol } = runtime
-    if (!protocol.canInvoke("web_app_request_write_access")) {
+    if (!protocol.mayInvoke("web_app_request_write_access")) {
       throw new Error("Write access requests are not supported in this Telegram version")
     }
 

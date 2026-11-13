@@ -38,7 +38,7 @@ const createOpenTelegramLink =
     }
 
     const path = parsed.pathname + parsed.search
-    if (runtime.protocol.canInvoke("web_app_open_tg_link")) {
+    if (runtime.protocol.mayInvoke("web_app_open_tg_link")) {
       runtime.protocol.invoke("web_app_open_tg_link", { path_full: path })
       return
     }

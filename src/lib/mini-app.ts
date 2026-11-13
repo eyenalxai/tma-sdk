@@ -10,7 +10,7 @@ type MiniApp = {
 
 const createMiniApp = (runtime: TelegramRuntime): MiniApp => {
   const { protocol } = runtime
-  const isReadySupported = protocol.canInvoke("web_app_ready")
+  const isReadySupported = protocol.mayInvoke("web_app_ready")
 
   return {
     ready: () => {

@@ -19,7 +19,7 @@ type HapticFeedback = {
 
 const createHapticFeedback = (runtime: TelegramRuntime): HapticFeedback => {
   const { protocol } = runtime
-  const isSupported = protocol.canInvoke("web_app_trigger_haptic_feedback")
+  const isSupported = protocol.mayInvoke("web_app_trigger_haptic_feedback")
 
   const trigger = (params: HapticFeedbackParams) => {
     if (isSupported) {

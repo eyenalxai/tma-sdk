@@ -652,7 +652,7 @@ const methodTable = {
     since: "6.0",
     platforms: { ...unsupportedOnDesktop, ...unsupportedOnWebK },
   },
-  web_app_close: { events: [], since: "6.0" },
+  web_app_close: { events: [], since: "6.0", paramVersions: { return_back: "7.6" } },
   // The public payload is a raw string; the wire wraps it in `{data}`.
   web_app_data_send: { events: [], since: "6.0", raw: true },
   web_app_switch_inline_query: { events: [], since: "6.7" },

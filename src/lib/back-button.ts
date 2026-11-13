@@ -19,7 +19,7 @@ type BackButton = {
 
 const createBackButton = (runtime: TelegramRuntime): BackButton => {
   const { protocol } = runtime
-  const isSupported = protocol.canInvoke("web_app_setup_back_button")
+  const isSupported = protocol.mayInvoke("web_app_setup_back_button")
   const store = createStore<BackButtonState>({ isVisible: false })
 
   const setVisible = (isVisible: boolean) => {

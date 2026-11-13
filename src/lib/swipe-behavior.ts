@@ -10,7 +10,7 @@ type SwipeBehavior = {
 
 const createSwipeBehavior = (runtime: TelegramRuntime): SwipeBehavior => {
   const { protocol } = runtime
-  const isSupported = protocol.canInvoke("web_app_setup_swipe_behavior")
+  const isSupported = protocol.mayInvoke("web_app_setup_swipe_behavior")
 
   const setVerticalEnabled = (enabled: boolean) => {
     if (isSupported) {

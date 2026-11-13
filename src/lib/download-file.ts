@@ -10,7 +10,7 @@ const createDownloadFile =
   (runtime: TelegramRuntime) =>
   async (url: string, fileName: string): Promise<void> => {
     const { protocol } = runtime
-    if (!protocol.canInvoke("web_app_request_file_download")) {
+    if (!protocol.mayInvoke("web_app_request_file_download")) {
       throw new Error("File download is not supported in this Telegram version")
     }
 

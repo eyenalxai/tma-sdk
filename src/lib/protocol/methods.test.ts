@@ -52,14 +52,21 @@ const scriptMethods = (script: string): string[] => [
   ),
 ]
 
-const scriptEvents = (script: string): string[] => [
-  ...new Set([
-    ...[...script.matchAll(/onEvent\('(?<event>[a-z0-9_]+)'/gu)].map(
-      (match) => match.groups?.event ?? "",
-    ),
-    ...NON_ON_EVENT_REGISTRATIONS,
-  ]),
-]
+const scriptEvents = (script: string): string[] => {
+  for (const event of NON_ON_EVENT_REGISTRATIONS) {
+    if (!script.includes(event)) {
+      throw new Error(`Vendored script is missing ${event}`)
+    }
+  }
+  return [
+    ...new Set([
+      ...[...script.matchAll(/onEvent\('(?<event>[a-z0-9_]+)'/gu)].map(
+        (match) => match.groups?.event ?? "",
+      ),
+      ...NON_ON_EVENT_REGISTRATIONS,
+    ]),
+  ]
+}
 
 const publicScriptMethods = (script: string): string[] =>
   scriptMethods(script).filter((method) => !INTERNAL_SCRIPT_METHODS.has(method))

@@ -216,7 +216,7 @@ describe("transport", () => {
     const protocol = createProtocol({ platform: "web", version: "9.0", window: browserWindow })
 
     expect(protocol.supports("web_app_request_viewport")).toBe("unsupported")
-    expect(protocol.canInvoke("web_app_request_viewport")).toBe(false)
+    expect(protocol.mayInvoke("web_app_request_viewport")).toBe(false)
     expect(() => {
       protocol.invoke("web_app_request_viewport")
     }).toThrow('Method "web_app_request_viewport" is not supported')

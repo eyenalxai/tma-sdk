@@ -52,7 +52,7 @@ type Protocol = {
   request: Request
   on: On
   supports: (method: Method) => Capability
-  canInvoke: (method: Method) => boolean
+  mayInvoke: (method: Method) => boolean
   supportsParam: (method: Method, param: string) => boolean
   readonly isFramed: boolean
   destroy: () => void
@@ -108,7 +108,7 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
     }
     const capability = getCapabilityFor(method)
     if (capability === "unsupported") {
-      throw new UnsupportedMethodError({ method, platform, version })
+      throw new UnsupportedMethodError({ method, platform: capabilityPlatform, version })
     }
     transport.send(encodeMethod(method, params))
   }
@@ -168,7 +168,7 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
           reject(
             new ProtocolTimeoutError({
               method,
-              platform,
+              platform: capabilityPlatform,
               version,
               events,
               timeout,
@@ -238,7 +238,7 @@ const createProtocol = (options: CreateProtocolOptions): Protocol => {
     request,
     on,
     supports: getCapabilityFor,
-    canInvoke: (method) => getCapabilityFor(method) !== "unsupported",
+    mayInvoke: (method) => getCapabilityFor(method) !== "unsupported",
     supportsParam: (method, param) => getParamCapability(method, param, version),
     isFramed: transport.isFramed,
     destroy: () => {
