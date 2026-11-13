@@ -1,11 +1,23 @@
-type Store<T extends object> = {
+type ReadonlyStore<T> = {
   get: () => T
-  set: (value: T) => void
-  update: (partial: Partial<T>) => void
   subscribe: (listener: () => void) => () => void
 }
 
-const createStore = <T extends object>(initial: T): Store<T> => {
+type Store<T extends object> = ReadonlyStore<T> & {
+  set: (value: T) => void
+  update: (partial: Partial<T>) => void
+}
+
+type ScalarStore<T> = ReadonlyStore<T> & {
+  set: (value: T) => void
+}
+
+type StoreCore<T> = {
+  readonly store: ReadonlyStore<T>
+  set: (value: T) => void
+}
+
+const createStoreCore = <T>(initial: T): StoreCore<T> => {
   let value = initial
   const listeners = new Set<() => void>()
 
@@ -16,7 +28,15 @@ const createStore = <T extends object>(initial: T): Store<T> => {
   }
 
   return {
-    get: () => value,
+    store: {
+      get: () => value,
+      subscribe: (listener) => {
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+        }
+      },
+    },
     set: (next) => {
       if (Object.is(value, next)) {
         return
@@ -24,10 +44,20 @@ const createStore = <T extends object>(initial: T): Store<T> => {
       value = next
       notify()
     },
+  }
+}
+
+const createStore = <T extends object>(initial: T): Store<T> => {
+  const { store, set } = createStoreCore(initial)
+
+  return {
+    ...store,
+    set,
     update: (partial) => {
+      const current = store.get()
       let hasChanges = false
       for (const key in partial) {
-        if (Object.hasOwn(partial, key) && !Object.is(value[key], partial[key])) {
+        if (Object.hasOwn(partial, key) && !Object.is(current[key], partial[key])) {
           hasChanges = true
           break
         }
@@ -35,16 +65,14 @@ const createStore = <T extends object>(initial: T): Store<T> => {
       if (!hasChanges) {
         return
       }
-      value = { ...value, ...partial }
-      notify()
-    },
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
+      set({ ...current, ...partial })
     },
   }
 }
 
-export { createStore, type Store }
+const createScalarStore = <T>(initial: T): ScalarStore<T> => {
+  const { store, set } = createStoreCore(initial)
+  return { ...store, set }
+}
+
+export { createScalarStore, createStore, type ReadonlyStore, type ScalarStore, type Store }
