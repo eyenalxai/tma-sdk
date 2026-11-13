@@ -37,6 +37,19 @@ describe("parseInitData", () => {
     })
   })
 
+  it("parses the chat join request query id", () => {
+    const initData = parseInitData(
+      new URLSearchParams({
+        auth_date: "1700000000",
+        chat_join_request_query_id: "AAHdF6IQAAAAAN0XohDhrOrc",
+        hash: "a".repeat(64),
+      }),
+    )
+
+    const queryId: string | undefined = initData.chat_join_request_query_id
+    expect(queryId).toBe("AAHdF6IQAAAAAN0XohDhrOrc")
+  })
+
   it("throws when the hash is missing", () => {
     expect(() => parseInitData("auth_date=1662771648")).toThrow()
   })

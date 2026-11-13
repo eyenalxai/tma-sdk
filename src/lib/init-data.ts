@@ -51,6 +51,7 @@ const initDataSchema = z.looseObject({
   chat: jsonString(initDataChatSchema).optional(),
   chat_type: z.string().optional(),
   chat_instance: z.string().optional(),
+  chat_join_request_query_id: z.string().optional(),
   hash: z.string().regex(/^[\da-f]{64}$/u),
   query_id: z.string().optional(),
   receiver: jsonString(initDataUserSchema).optional(),
