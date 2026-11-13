@@ -56,8 +56,12 @@ _Avoid_: message, callback, notification
 The version of the Mini Apps protocol supported by the Telegram client that launched the Mini App, reported in launch parameters.
 _Avoid_: app version, client version, Telegram version
 
+**Feature registry**:
+The `session.features` object that groups every feature controller under one uniform contract: `supported`, `state` and `actions`.
+_Avoid_: feature bag, API surface
+
 **Feature controller**:
-One of the per-feature objects a Mini App session exposes (back button, viewport, haptics, and so on).
+One of the per-feature objects a Mini App session exposes (back button, viewport, haptics, and so on). Every controller exposes `supported` from the protocol table, a read-only `state` store and user-facing `actions`.
 _Avoid_: module, service, manager
 
 ### Platforms and viewport

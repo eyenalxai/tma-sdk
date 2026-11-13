@@ -1,30 +1,34 @@
+import type { FeatureController } from "#lib/features/controller"
+import type { TelegramRuntime } from "#lib/telegram-runtime"
+
 import { invokeBestEffort } from "#lib/protocol/client"
-
-import type { Store } from "./store"
-import type { TelegramRuntime } from "./telegram-runtime"
-
-import { createStore } from "./store"
+import { createStore } from "#lib/store"
 
 type BackButtonState = {
   isVisible: boolean
 }
 
-type BackButton = {
-  isSupported: boolean
-  store: Store<BackButtonState>
-  sync: () => void
+type BackButtonActions = {
   show: () => void
   hide: () => void
   onClick: (listener: () => void) => () => void
 }
 
-const createBackButton = (runtime: TelegramRuntime): BackButton => {
+type BackButtonController = FeatureController<BackButtonState, BackButtonActions>
+
+type BackButtonHandle = {
+  feature: BackButtonController
+  /** Session-owned: posts the stored visibility even when it has not changed. */
+  sync: () => void
+}
+
+const createBackButton = (runtime: TelegramRuntime): BackButtonHandle => {
   const { protocol } = runtime
-  const isSupported = protocol.mayInvoke("web_app_setup_back_button")
+  const supported = protocol.mayInvoke("web_app_setup_back_button")
   const store = createStore<BackButtonState>({ isVisible: false })
 
-  const postVisibility = (isVisible: boolean) => {
-    if (!isSupported) {
+  const postVisibility = (isVisible: boolean): void => {
+    if (!supported) {
       return
     }
     if (invokeBestEffort(protocol, "web_app_setup_back_button", { is_visible: isVisible })) {
@@ -32,7 +36,7 @@ const createBackButton = (runtime: TelegramRuntime): BackButton => {
     }
   }
 
-  const setVisible = (isVisible: boolean) => {
+  const setVisible = (isVisible: boolean): void => {
     if (store.get().isVisible === isVisible) {
       return
     }
@@ -40,20 +44,30 @@ const createBackButton = (runtime: TelegramRuntime): BackButton => {
   }
 
   return {
-    isSupported,
-    store,
+    feature: {
+      supported,
+      state: store,
+      actions: {
+        show: () => {
+          setVisible(true)
+        },
+        hide: () => {
+          setVisible(false)
+        },
+        onClick: (listener) => protocol.on("back_button_pressed", listener),
+      },
+    },
     // A native reload keeps its own back-button state, so sync reconciles it.
     sync: () => {
       postVisibility(store.get().isVisible)
     },
-    show: () => {
-      setVisible(true)
-    },
-    hide: () => {
-      setVisible(false)
-    },
-    onClick: (listener) => protocol.on("back_button_pressed", listener),
   }
 }
 
-export { createBackButton, type BackButton }
+export {
+  createBackButton,
+  type BackButtonActions,
+  type BackButtonController,
+  type BackButtonHandle,
+  type BackButtonState,
+}

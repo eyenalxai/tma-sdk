@@ -1,12 +1,12 @@
+import type { FeatureController } from "#lib/features/controller"
 import type { PartialSafeAreaInsets, SafeAreaInsets } from "#lib/protocol/methods"
 
 import { invokeBestEffort } from "#lib/protocol/client"
+import { createStore } from "#lib/store"
 
-import type { Store } from "./store"
 import type { TelegramRuntime } from "./telegram-runtime"
 
 import { getPlatform } from "./platform"
-import { createStore } from "./store"
 import { bindViewportCssVariables } from "./viewport-css-vars"
 
 type ViewportState = {
@@ -19,13 +19,19 @@ type ViewportState = {
   contentSafeAreaInsets: SafeAreaInsets
 }
 
-type Viewport = {
-  store: Store<ViewportState>
-  isFullscreenSupported: boolean
-  mount: () => Promise<void>
+type ViewportActions = {
   expand: () => void
   requestFullscreen: () => Promise<void>
   exitFullscreen: () => Promise<void>
+}
+
+type ViewportController = FeatureController<ViewportState, ViewportActions>
+
+type ViewportHandle = {
+  feature: ViewportController
+  /** Session-owned: mounts the event subscriptions and requests the initial state. */
+  mount: () => Promise<void>
+  /** Session-owned: binds the viewport and safe-area CSS variables. */
   bindCssVars: () => () => void
 }
 
@@ -53,7 +59,7 @@ const initialViewportState: ViewportState = {
 const createViewport = (
   runtime: TelegramRuntime,
   options: { platform: string; isFullscreen: boolean },
-): Viewport => {
+): ViewportHandle => {
   const { protocol } = runtime
   const { platform } = options
   const platformInfo = getPlatform(platform)
@@ -148,9 +154,23 @@ const createViewport = (
     }
   }
 
+  const feature: ViewportController = {
+    supported:
+      protocol.mayInvoke("web_app_expand") || protocol.mayInvoke("web_app_request_fullscreen"),
+    state: store,
+    actions: {
+      expand: () => {
+        if (protocol.mayInvoke("web_app_expand")) {
+          invokeBestEffort(protocol, "web_app_expand")
+        }
+      },
+      requestFullscreen: async () => changeFullscreen(true),
+      exitFullscreen: async () => changeFullscreen(false),
+    },
+  }
+
   return {
-    store,
-    isFullscreenSupported,
+    feature,
     mount: async () => {
       if (runtime.disposer.isDisposed) {
         throw new Error("Cannot mount a disposed Telegram viewport")
@@ -158,15 +178,15 @@ const createViewport = (
       mountPromise ??= doMount()
       return mountPromise
     },
-    expand: () => {
-      if (protocol.mayInvoke("web_app_expand")) {
-        invokeBestEffort(protocol, "web_app_expand")
-      }
-    },
-    requestFullscreen: async () => changeFullscreen(true),
-    exitFullscreen: async () => changeFullscreen(false),
     bindCssVars: () => bindViewportCssVariables(store),
   }
 }
 
-export { createViewport, initialViewportState, type Viewport, type ViewportState }
+export {
+  createViewport,
+  initialViewportState,
+  type ViewportActions,
+  type ViewportController,
+  type ViewportHandle,
+  type ViewportState,
+}

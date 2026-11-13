@@ -115,7 +115,7 @@ describe("createViewport", () => {
         "web_app_request_safe_area",
         "web_app_request_content_safe_area",
       ])
-      expect(viewport.store.get().isExpanded).toBe(true)
+      expect(viewport.feature.state.get().isExpanded).toBe(true)
     } finally {
       environment.restoreWindow()
     }
@@ -147,7 +147,7 @@ describe("createViewport", () => {
       await mountTracking
 
       expect(isMounted).toBe(true)
-      expect(viewport.store.get().height).toBe(640)
+      expect(viewport.feature.state.get().height).toBe(640)
       expect(environment.posts).toEqual([
         "web_app_request_viewport",
         "web_app_request_safe_area",
@@ -172,13 +172,13 @@ describe("createViewport", () => {
       environment.emit("safe_area_changed", { top: 20 })
       environment.emit("content_safe_area_changed", { bottom: 6 })
 
-      expect(viewport.store.get().safeAreaInsets).toEqual({
+      expect(viewport.feature.state.get().safeAreaInsets).toEqual({
         top: 20,
         bottom: 8,
         left: 4,
         right: 2,
       })
-      expect(viewport.store.get().contentSafeAreaInsets).toEqual({
+      expect(viewport.feature.state.get().contentSafeAreaInsets).toEqual({
         top: 0,
         bottom: 6,
         left: 3,
@@ -197,11 +197,11 @@ describe("createViewport", () => {
         isFullscreen: true,
       })
 
-      const exiting = viewport.exitFullscreen()
+      const exiting = viewport.feature.actions.exitFullscreen()
       environment.emit("fullscreen_failed", { error: "ALREADY_FULLSCREEN" })
       await exiting
 
-      expect(viewport.store.get().isFullscreen).toBe(false)
+      expect(viewport.feature.state.get().isFullscreen).toBe(false)
       expect(environment.posts).toContain("web_app_exit_fullscreen")
     } finally {
       environment.restoreWindow()
@@ -216,11 +216,11 @@ describe("createViewport", () => {
         isFullscreen: false,
       })
 
-      const entering = viewport.requestFullscreen()
+      const entering = viewport.feature.actions.requestFullscreen()
       environment.emit("fullscreen_failed", { error: "ALREADY_FULLSCREEN" })
       await entering
 
-      expect(viewport.store.get().isFullscreen).toBe(true)
+      expect(viewport.feature.state.get().isFullscreen).toBe(true)
       expect(environment.posts).toContain("web_app_request_fullscreen")
     } finally {
       environment.restoreWindow()
@@ -235,12 +235,12 @@ describe("createViewport", () => {
         isFullscreen: false,
       })
 
-      const entering = viewport.requestFullscreen()
+      const entering = viewport.feature.actions.requestFullscreen()
       environment.emit("fullscreen_failed", { error: "UNSUPPORTED" })
       const failure = await catchFailure(entering)
 
       expect(failure).toBeInstanceOf(Error)
-      expect(viewport.store.get().isFullscreen).toBe(false)
+      expect(viewport.feature.state.get().isFullscreen).toBe(false)
     } finally {
       environment.restoreWindow()
     }
@@ -256,8 +256,8 @@ describe("createViewport", () => {
 
       await viewport.mount()
 
-      expect(viewport.store.get().height).toBe(800)
-      expect(viewport.store.get().isExpanded).toBe(true)
+      expect(viewport.feature.state.get().height).toBe(800)
+      expect(viewport.feature.state.get().isExpanded).toBe(true)
       expect(environment.posts).toEqual(["web_app_request_safe_area"])
     } finally {
       environment.restoreWindow()
@@ -275,7 +275,26 @@ describe("createViewport", () => {
       await viewport.mount()
 
       expect(environment.posts).toEqual([])
-      expect(viewport.store.get().isExpanded).toBe(true)
+      expect(viewport.feature.state.get().isExpanded).toBe(true)
+    } finally {
+      environment.restoreWindow()
+    }
+  })
+
+  it("exposes only the user-facing actions in the feature", () => {
+    const environment = createTestEnvironment("ios")
+    try {
+      const viewport = createViewport(environment.runtime, {
+        platform: "ios",
+        isFullscreen: false,
+      })
+
+      expect(viewport.feature.supported).toBe(true)
+      expect(Object.keys(viewport.feature.actions).toSorted()).toEqual([
+        "exitFullscreen",
+        "expand",
+        "requestFullscreen",
+      ])
     } finally {
       environment.restoreWindow()
     }

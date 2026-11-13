@@ -940,6 +940,7 @@ export {
   type EventName,
   type EventPayloads,
   type HapticFeedbackParams,
+  type MainButtonParams,
   type Method,
   type MethodArgs,
   type MethodCorrelation,
@@ -948,5 +949,7 @@ export {
   type OpenLinkBrowser,
   type Platform,
   type PartialSafeAreaInsets,
+  type PopupButton,
+  type PopupParams,
   type SafeAreaInsets,
 }

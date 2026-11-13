@@ -47,7 +47,7 @@ const Main = () => {
 }
 ```
 
-`SessionProvider` creates the session on the client, mounts the viewport, binds Telegram's viewport and safe-area CSS variables (`--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-safe-area-inset-*`, `--tg-content-safe-area-inset-*`), and destroys the session when unmounted. It renders `fallback` until the session starts.
+`SessionProvider` creates the session on the client, mounts the viewport, binds Telegram's viewport, safe-area and theme CSS variables (`--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-safe-area-inset-*`, `--tg-content-safe-area-inset-*`, `--tg-theme-*`, `--tg-color-scheme`), and destroys the session when unmounted. It renders `fallback` until the session starts.
 
 The provider leaves readiness to the app by default. Call `session.markReady()` when your first screen is ready, or set `autoReady` to mark the Mini App ready as soon as `start()` resolves. Pass `onError` to receive initialization failures instead of throwing to the nearest React error boundary. `expand` and `disableVerticalSwipes` default to `false`, so the provider does not change native behavior unless asked.
 
@@ -60,7 +60,7 @@ const session = createSession()
 
 await session.start()
 session.markReady()
-session.features.viewport.expand()
+session.features.viewport.actions.expand()
 
 // Later, when leaving the Mini App:
 session.destroy()
@@ -68,7 +68,58 @@ session.destroy()
 
 `createSession()` returns synchronously and installs the Telegram event bridge before any await. Init data is nullable because some launches have none; call `session.requireInitData()` when the app cannot work without it. A passive bridge captures viewport, fullscreen, safe-area, theme and visibility events from module import, so an event that arrives before `createSession()` is delivered to the first subscriber. Stateful events then keep their last payload and replay it to a later subscriber.
 
-The read-only session status moves from `launched` to `mounted` and then `ready`, and ends at `closed` after `destroy()`. A failed start leaves it at `failed` until `destroy()`; `markReady()` only takes effect after mount.
+The read-only session status moves from `launched` to `mounted` and then `ready`, and ends at `closed` after `destroy()`. A failed start leaves it at `failed` until `destroy()`; `markReady()` only takes effect after mount and sends `web_app_ready`.
+
+## Features
+
+`session.features` is one registry of controllers. Every controller has the same shape:
+
+```ts
+type FeatureController<State, Actions> = {
+  supported: boolean
+  state: ReadonlyStore<State>
+  actions: Actions
+}
+```
+
+`supported` comes from the protocol table, `state` is read-only (`get()` and `subscribe()`, which the React hooks use), and `actions` holds the user-facing calls. The registry covers theme, viewport, back button, main button, secondary button, settings button, closing behavior, swipe behavior, haptics, links, downloads, write access, dialogs and clipboard.
+
+```ts
+const session = createSession()
+await session.start()
+
+// Theme: store, request and CSS-variable binder
+const theme = await session.features.theme.actions.request()
+session.features.theme.actions.setHeaderColor("#1c1c1d")
+const unbindTheme = session.features.theme.actions.bindCssVars()
+
+// Bottom buttons: uniform set(partial) and onClick(listener)
+session.features.mainButton.actions.set({ isVisible: true, text: "Pay" })
+session.features.mainButton.actions.onClick(() => {
+  // handle the press
+})
+
+// Dialogs and clipboard
+const pressed = await session.features.dialogs.actions.show({
+  message: "Delete this item?",
+  buttons: [
+    { id: "delete", type: "destructive" },
+    { id: "cancel", type: "cancel" },
+  ],
+})
+const confirmed = await session.features.dialogs.actions.confirm("Continue?")
+const text = await session.features.clipboard.actions.read()
+
+// Downloads resolve with the status instead of throwing on cancel
+const status = await session.features.downloads.actions.request(
+  "https://example.com/file.pdf",
+  "file.pdf",
+)
+```
+
+`mainButton`, `secondaryButton` and `settingsButton` share `set(partial)` and `onClick(listener)`. `set` merges the partial into the stored state and posts the whole button state; the secondary button state also carries `position`, and the settings button also keeps `show()` and `hide()`. Dialogs resolve with the pressed button id (or `null`), `alert()` resolves, and `confirm()` resolves to a boolean. Clipboard reads resolve with the text or `null`. A cancelled download is the `"cancelled"` status, not an error.
+
+For a method without a controller, `session.protocol.invoke(method, params)` remains the escape hatch; `session.protocol.request(...)` covers the methods that answer with an event.
 
 ## Launch parameters and init data
 

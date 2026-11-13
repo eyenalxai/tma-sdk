@@ -1,8 +1,9 @@
+import type { FeatureController } from "#lib/features/controller"
 import type { HapticFeedbackParams } from "#lib/protocol/methods"
+import type { TelegramRuntime } from "#lib/telegram-runtime"
 
 import { invokeBestEffort } from "#lib/protocol/client"
-
-import type { TelegramRuntime } from "./telegram-runtime"
+import { createConstantStore } from "#lib/store"
 
 type ImpactHapticFeedbackStyle = Extract<HapticFeedbackParams, { type: "impact" }>["impact_style"]
 type NotificationHapticFeedbackType = Extract<
@@ -10,40 +11,45 @@ type NotificationHapticFeedbackType = Extract<
   { type: "notification" }
 >["notification_type"]
 
-type HapticFeedback = {
-  isSupported: boolean
-  impactOccurred: (style: ImpactHapticFeedbackStyle) => void
-  notificationOccurred: (type: NotificationHapticFeedbackType) => void
-  selectionChanged: () => void
+type HapticsActions = {
+  impact: (style: ImpactHapticFeedbackStyle) => void
+  notification: (type: NotificationHapticFeedbackType) => void
+  selection: () => void
 }
 
-const createHapticFeedback = (runtime: TelegramRuntime): HapticFeedback => {
-  const { protocol } = runtime
-  const isSupported = protocol.mayInvoke("web_app_trigger_haptic_feedback")
+type HapticsController = FeatureController<null, HapticsActions>
 
-  const trigger = (params: HapticFeedbackParams) => {
-    if (isSupported) {
+const createHaptics = (runtime: TelegramRuntime): HapticsController => {
+  const { protocol } = runtime
+  const supported = protocol.mayInvoke("web_app_trigger_haptic_feedback")
+
+  const trigger = (params: HapticFeedbackParams): void => {
+    if (supported) {
       invokeBestEffort(protocol, "web_app_trigger_haptic_feedback", params)
     }
   }
 
   return {
-    isSupported,
-    impactOccurred: (style) => {
-      trigger({ type: "impact", impact_style: style })
-    },
-    notificationOccurred: (type) => {
-      trigger({ type: "notification", notification_type: type })
-    },
-    selectionChanged: () => {
-      trigger({ type: "selection_change" })
+    supported,
+    state: createConstantStore(null),
+    actions: {
+      impact: (style) => {
+        trigger({ type: "impact", impact_style: style })
+      },
+      notification: (type) => {
+        trigger({ type: "notification", notification_type: type })
+      },
+      selection: () => {
+        trigger({ type: "selection_change" })
+      },
     },
   }
 }
 
 export {
-  createHapticFeedback,
-  type HapticFeedback,
+  createHaptics,
+  type HapticsActions,
+  type HapticsController,
   type ImpactHapticFeedbackStyle,
   type NotificationHapticFeedbackType,
 }

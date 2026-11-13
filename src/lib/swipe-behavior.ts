@@ -1,32 +1,53 @@
+import type { FeatureController } from "#lib/features/controller"
+import type { TelegramRuntime } from "#lib/telegram-runtime"
+
 import { invokeBestEffort } from "#lib/protocol/client"
+import { createStore } from "#lib/store"
 
-import type { TelegramRuntime } from "./telegram-runtime"
+type SwipeBehaviorState = {
+  isVerticalEnabled: boolean
+}
 
-type SwipeBehavior = {
-  isSupported: boolean
+type SwipeBehaviorActions = {
   enableVertical: () => void
   disableVertical: () => void
 }
 
-const createSwipeBehavior = (runtime: TelegramRuntime): SwipeBehavior => {
-  const { protocol } = runtime
-  const isSupported = protocol.mayInvoke("web_app_setup_swipe_behavior")
+type SwipeBehaviorController = FeatureController<SwipeBehaviorState, SwipeBehaviorActions>
 
-  const setVerticalEnabled = (enabled: boolean) => {
-    if (isSupported) {
+const createSwipeBehavior = (runtime: TelegramRuntime): SwipeBehaviorController => {
+  const { protocol } = runtime
+  const supported = protocol.mayInvoke("web_app_setup_swipe_behavior")
+  const store = createStore<SwipeBehaviorState>({ isVerticalEnabled: true })
+
+  const setVerticalEnabled = (enabled: boolean): void => {
+    if (!supported || store.get().isVerticalEnabled === enabled) {
+      return
+    }
+    if (
       invokeBestEffort(protocol, "web_app_setup_swipe_behavior", { allow_vertical_swipe: enabled })
+    ) {
+      store.set({ isVerticalEnabled: enabled })
     }
   }
 
   return {
-    isSupported,
-    enableVertical: () => {
-      setVerticalEnabled(true)
-    },
-    disableVertical: () => {
-      setVerticalEnabled(false)
+    supported,
+    state: store,
+    actions: {
+      enableVertical: () => {
+        setVerticalEnabled(true)
+      },
+      disableVertical: () => {
+        setVerticalEnabled(false)
+      },
     },
   }
 }
 
-export { createSwipeBehavior, type SwipeBehavior }
+export {
+  createSwipeBehavior,
+  type SwipeBehaviorActions,
+  type SwipeBehaviorController,
+  type SwipeBehaviorState,
+}

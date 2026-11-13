@@ -1,27 +1,56 @@
-import { USER_CONFIRMATION_TIMEOUT_MS } from "#lib/protocol/client"
+import type { FeatureController } from "#lib/features/controller"
+import type { TelegramRuntime } from "#lib/telegram-runtime"
 
-import type { TelegramRuntime } from "./telegram-runtime"
+import { USER_CONFIRMATION_TIMEOUT_MS } from "#lib/protocol/client"
+import { createStore } from "#lib/store"
 
 type WriteAccessStatus = "allowed" | "cancelled"
 
+type WriteAccessState = {
+  status: WriteAccessStatus | null
+}
+
+type WriteAccessActions = {
+  /** Requests write message access and resolves with the reported status. */
+  request: () => Promise<WriteAccessStatus>
+}
+
+type WriteAccessController = FeatureController<WriteAccessState, WriteAccessActions>
+
 /**
  * Requests write message access to the current user.
- * @returns The status reported by the Telegram client ("allowed" or "cancelled").
  * @since Mini Apps v6.9
  */
-const createRequestWriteAccess =
-  (runtime: TelegramRuntime) => async (): Promise<WriteAccessStatus> => {
-    const { protocol } = runtime
-    if (!protocol.mayInvoke("web_app_request_write_access")) {
-      throw new Error("Write access requests are not supported in this Telegram version")
-    }
+const createWriteAccess = (runtime: TelegramRuntime): WriteAccessController => {
+  const { protocol } = runtime
+  const supported = protocol.mayInvoke("web_app_request_write_access")
+  const store = createStore<WriteAccessState>({ status: null })
 
-    const { payload } = await protocol.request({
-      method: ["web_app_request_write_access"],
-      timeout: USER_CONFIRMATION_TIMEOUT_MS,
-    })
+  return {
+    supported,
+    state: store,
+    actions: {
+      request: async () => {
+        if (!supported) {
+          throw new Error("Write access requests are not supported in this Telegram version")
+        }
 
-    return payload.status
+        const { payload } = await protocol.request({
+          method: ["web_app_request_write_access"],
+          timeout: USER_CONFIRMATION_TIMEOUT_MS,
+        })
+
+        store.set({ status: payload.status })
+        return payload.status
+      },
+    },
   }
+}
 
-export { createRequestWriteAccess, type WriteAccessStatus }
+export {
+  createWriteAccess,
+  type WriteAccessActions,
+  type WriteAccessController,
+  type WriteAccessState,
+  type WriteAccessStatus,
+}

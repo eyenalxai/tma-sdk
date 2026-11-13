@@ -75,4 +75,21 @@ const createScalarStore = <T>(initial: T): ScalarStore<T> => {
   return { ...store, set }
 }
 
-export { createScalarStore, createStore, type ReadonlyStore, type ScalarStore, type Store }
+const noopSubscribe = (): (() => void) => () => undefined
+
+/** A store whose value never changes, for stateless controllers. */
+const createConstantStore = <T>(value: T): ReadonlyStore<T> => {
+  return {
+    get: () => value,
+    subscribe: noopSubscribe,
+  }
+}
+
+export {
+  createConstantStore,
+  createScalarStore,
+  createStore,
+  type ReadonlyStore,
+  type ScalarStore,
+  type Store,
+}

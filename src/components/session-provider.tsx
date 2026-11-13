@@ -99,7 +99,7 @@ const SessionProvider = ({
       if (current !== null) {
         // Restore swipes first: after destroy the protocol cannot send this method.
         if (verticalSwipesDisabledRef.current && current.status.get() !== "closed") {
-          current.features.swipeBehavior.enableVertical()
+          current.features.swipeBehavior.actions.enableVertical()
         }
         verticalSwipesDisabledRef.current = false
         current.destroy()
@@ -109,7 +109,7 @@ const SessionProvider = ({
 
   useEffect(() => {
     if (session !== null && expand) {
-      session.features.viewport.expand()
+      session.features.viewport.actions.expand()
     }
   }, [expand, session])
 
@@ -119,11 +119,11 @@ const SessionProvider = ({
     }
 
     const { swipeBehavior } = session.features
-    swipeBehavior.disableVertical()
+    swipeBehavior.actions.disableVertical()
     verticalSwipesDisabledRef.current = true
     return () => {
       if (session.status.get() !== "closed") {
-        swipeBehavior.enableVertical()
+        swipeBehavior.actions.enableVertical()
       }
       verticalSwipesDisabledRef.current = false
     }

@@ -1,27 +1,57 @@
-import { USER_CONFIRMATION_TIMEOUT_MS } from "#lib/protocol/client"
+import type { FeatureController } from "#lib/features/controller"
+import type { TelegramRuntime } from "#lib/telegram-runtime"
 
-import type { TelegramRuntime } from "./telegram-runtime"
+import { USER_CONFIRMATION_TIMEOUT_MS } from "#lib/protocol/client"
+import { createStore } from "#lib/store"
+
+type DownloadStatus = "downloading" | "cancelled"
+
+type DownloadsState = {
+  status: DownloadStatus | null
+}
+
+type DownloadsActions = {
+  /** Asks Telegram to download the file and resolves with the reported status. */
+  request: (url: string, fileName: string) => Promise<DownloadStatus>
+}
+
+type DownloadsController = FeatureController<DownloadsState, DownloadsActions>
 
 /**
  * Displays a native popup prompting the user to download a file.
+ * A cancelled download is a status, not an error.
  * @since Mini Apps v8.0
  */
-const createDownloadFile =
-  (runtime: TelegramRuntime) =>
-  async (url: string, fileName: string): Promise<void> => {
-    const { protocol } = runtime
-    if (!protocol.mayInvoke("web_app_request_file_download")) {
-      throw new Error("File download is not supported in this Telegram version")
-    }
+const createDownloads = (runtime: TelegramRuntime): DownloadsController => {
+  const { protocol } = runtime
+  const supported = protocol.mayInvoke("web_app_request_file_download")
+  const store = createStore<DownloadsState>({ status: null })
 
-    const { payload } = await protocol.request({
-      method: ["web_app_request_file_download", { url, file_name: fileName }],
-      timeout: USER_CONFIRMATION_TIMEOUT_MS,
-    })
+  return {
+    supported,
+    state: store,
+    actions: {
+      request: async (url, fileName) => {
+        if (!supported) {
+          throw new Error("File downloads are not supported in this Telegram version")
+        }
 
-    if (payload.status !== "downloading") {
-      throw new Error("User denied the file download")
-    }
+        const { payload } = await protocol.request({
+          method: ["web_app_request_file_download", { url, file_name: fileName }],
+          timeout: USER_CONFIRMATION_TIMEOUT_MS,
+        })
+
+        store.set({ status: payload.status })
+        return payload.status
+      },
+    },
   }
+}
 
-export { createDownloadFile }
+export {
+  createDownloads,
+  type DownloadStatus,
+  type DownloadsActions,
+  type DownloadsController,
+  type DownloadsState,
+}

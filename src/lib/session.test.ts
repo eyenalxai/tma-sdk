@@ -251,7 +251,7 @@ describe("createSession", () => {
 
       await session.start()
       expect(session.initData).toBeNull()
-      expect(session.features.viewport.store.get()).toMatchObject({
+      expect(session.features.viewport.state.get()).toMatchObject({
         height: 640,
         width: 320,
       })
@@ -356,6 +356,29 @@ describe("createSession", () => {
     }
   })
 
+  it("does not send web_app_ready where the client does not implement it", async () => {
+    const environment = installFakeWindow("?tgWebAppPlatform=tdesktop&tgWebAppVersion=9.6")
+    try {
+      const session = createSession()
+      const started = session.start()
+      await flushMicrotasks()
+      environment.emit("viewport_changed", {
+        height: 640,
+        is_state_stable: true,
+        is_expanded: true,
+      })
+      await started
+
+      session.markReady()
+
+      expect(session.status.get()).toBe("ready")
+      expect(countPosts(environment.posts, "web_app_ready")).toBe(0)
+      session.destroy()
+    } finally {
+      environment.restore()
+    }
+  })
+
   it("reconciles native chrome when the session starts", async () => {
     const environment = installFakeWindow(launchWithoutInitData)
     try {
@@ -375,11 +398,11 @@ describe("createSession", () => {
       })
       await started
 
-      const entering = session.features.viewport.requestFullscreen()
+      const entering = session.features.viewport.actions.requestFullscreen()
       environment.emit("fullscreen_failed", { error: "ALREADY_FULLSCREEN" })
       await entering
 
-      expect(session.features.viewport.store.get().isFullscreen).toBe(true)
+      expect(session.features.viewport.state.get().isFullscreen).toBe(true)
       session.destroy()
     } finally {
       environment.restore()
