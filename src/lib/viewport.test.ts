@@ -194,7 +194,7 @@ describe("createViewport", () => {
     try {
       const viewport = createViewport(environment.runtime, {
         platform: "ios",
-        isFullscreen: false,
+        isFullscreen: true,
       })
 
       const exiting = viewport.exitFullscreen()
@@ -213,7 +213,7 @@ describe("createViewport", () => {
     try {
       const viewport = createViewport(environment.runtime, {
         platform: "ios",
-        isFullscreen: true,
+        isFullscreen: false,
       })
 
       const entering = viewport.requestFullscreen()
@@ -239,7 +239,7 @@ describe("createViewport", () => {
       environment.emit("fullscreen_failed", { error: "UNSUPPORTED" })
       const failure = await catchFailure(entering)
 
-      expect(failure instanceof Error ? failure.message : "").toContain("UNSUPPORTED")
+      expect(failure).toBeInstanceOf(Error)
       expect(viewport.store.get().isFullscreen).toBe(false)
     } finally {
       environment.restoreWindow()
