@@ -18,20 +18,6 @@ const catchFailure = async (promise: Promise<unknown>): Promise<unknown> => {
   throw new Error("Expected the request to reject")
 }
 
-const trackSettlement = (promise: Promise<unknown>): (() => boolean) => {
-  let isSettled = false
-  const track = async (): Promise<void> => {
-    try {
-      await promise
-    } catch {
-      // The test observes settlement, and asserts the outcome separately.
-    }
-    isSettled = true
-  }
-  void track()
-  return () => isSettled
-}
-
 describe("createProtocol invoke", () => {
   it("sends a method on a supported platform", () => {
     const { browserWindow, posts } = createNativeWindow()
@@ -276,29 +262,58 @@ describe("createProtocol request", () => {
     const second = protocol.request({ method: ["web_app_request_write_access"] })
 
     // Only the first call is on the wire; the second waits for its turn.
-    expect(posts).toEqual([{ eventType: "web_app_request_write_access", eventData: '""' }])
-
-    const isSecondSettled = trackSettlement(second)
+    expect(posts).toHaveLength(1)
 
     emit("write_access_requested", { status: "allowed" })
     expect(await first).toEqual({
       event: "write_access_requested",
       payload: { status: "allowed" },
     })
-    await Promise.resolve()
 
-    // One reply settles one request. The queued call starts on its own.
-    expect(isSecondSettled()).toBe(false)
-    expect(posts).toEqual([
-      { eventType: "web_app_request_write_access", eventData: '""' },
-      { eventType: "web_app_request_write_access", eventData: '""' },
-    ])
+    // One reply settled one request, and the queued call is now on the wire.
+    expect(posts).toHaveLength(2)
 
     emit("write_access_requested", { status: "cancelled" })
     expect(await second).toEqual({
       event: "write_access_requested",
       payload: { status: "cancelled" },
     })
+    protocol.destroy()
+  })
+
+  it("starts queued requests for one method in call order", async () => {
+    const { browserWindow, posts, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+    const first = protocol.request({
+      method: ["web_app_read_text_from_clipboard", { req_id: "first" }],
+    })
+    const second = protocol.request({
+      method: ["web_app_read_text_from_clipboard", { req_id: "second" }],
+    })
+    const third = protocol.request({
+      method: ["web_app_read_text_from_clipboard", { req_id: "third" }],
+    })
+
+    expect(posts).toEqual([
+      { eventType: "web_app_read_text_from_clipboard", eventData: '{"req_id":"first"}' },
+    ])
+
+    emit("clipboard_text_received", { req_id: "first", data: "one" })
+    expect(await first).toMatchObject({ payload: { req_id: "first" } })
+    expect(posts[1]).toEqual({
+      eventType: "web_app_read_text_from_clipboard",
+      eventData: '{"req_id":"second"}',
+    })
+
+    emit("clipboard_text_received", { req_id: "second", data: "two" })
+    expect(await second).toMatchObject({ payload: { req_id: "second" } })
+    expect(posts[2]).toEqual({
+      eventType: "web_app_read_text_from_clipboard",
+      eventData: '{"req_id":"third"}',
+    })
+
+    emit("clipboard_text_received", { req_id: "third", data: "three" })
+    expect(await third).toMatchObject({ payload: { req_id: "third" } })
     protocol.destroy()
   })
 
@@ -334,7 +349,6 @@ describe("createProtocol request", () => {
     const second = protocol.request({ method: ["web_app_request_viewport"] })
 
     expect(await catchFailure(first)).toBeInstanceOf(ProtocolTimeoutError)
-    await Promise.resolve()
 
     emit("viewport_changed", { height: 320, is_state_stable: true, is_expanded: false })
     expect(await second).toEqual({
@@ -344,23 +358,77 @@ describe("createProtocol request", () => {
     protocol.destroy()
   })
 
-  it("ignores a reply whose req_id does not match the request", async () => {
-    const { browserWindow, emit } = createNativeWindow()
+  it("starts a queued request's timeout when it takes its turn", async () => {
+    const { browserWindow, posts, emit } = createNativeWindow()
     const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
-    const pending = protocol.request({
-      method: ["web_app_read_text_from_clipboard", { req_id: "wanted" }],
-      correlate: (result) => result.payload.req_id === "wanted",
+    const first = protocol.request({
+      method: ["web_app_request_write_access"],
+      timeout: 60_000,
+    })
+    const second = protocol.request({ method: ["web_app_request_write_access"], timeout: 0 })
+    const observeSecond = async (): Promise<unknown> => {
+      try {
+        await second
+        return "resolved"
+      } catch (error) {
+        return error
+      }
+    }
+    const secondOutcome = observeSecond()
+
+    // A zero timeout would fire at once if the queued call started its clock while waiting.
+    expect(await Promise.race([secondOutcome, Bun.sleep(20).then(() => "waiting" as const)])).toBe(
+      "waiting",
+    )
+    expect(posts).toHaveLength(1)
+
+    emit("write_access_requested", { status: "allowed" })
+    await first
+
+    expect(await secondOutcome).toBeInstanceOf(ProtocolTimeoutError)
+    expect(posts).toHaveLength(2)
+    protocol.destroy()
+  })
+
+  it("ignores a clipboard reply for another req_id and resolves the next request on its own", async () => {
+    const { browserWindow, posts, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+    const first = protocol.request({
+      method: ["web_app_read_text_from_clipboard", { req_id: "first" }],
+    })
+    const second = protocol.request({
+      method: ["web_app_read_text_from_clipboard", { req_id: "second" }],
     })
 
-    emit("clipboard_text_received", { req_id: "other", data: "stale" })
-    const isSettled = trackSettlement(pending)
-    await Promise.resolve()
-    expect(isSettled()).toBe(false)
+    // A late reply for the next request must not settle the active one.
+    emit("clipboard_text_received", { req_id: "second", data: "late" })
+    emit("clipboard_text_received", { req_id: "first", data: "one" })
 
-    emit("clipboard_text_received", { req_id: "wanted", data: "fresh" })
-    expect(await pending).toEqual({
+    expect(await first).toEqual({
       event: "clipboard_text_received",
-      payload: { req_id: "wanted", data: "fresh" },
+      payload: { req_id: "first", data: "one" },
+    })
+    expect(posts).toHaveLength(2)
+
+    emit("clipboard_text_received", { req_id: "second", data: "two" })
+    expect(await second).toEqual({
+      event: "clipboard_text_received",
+      payload: { req_id: "second", data: "two" },
+    })
+    protocol.destroy()
+  })
+
+  it("correlates invoice replies on the slug", async () => {
+    const { browserWindow, emit } = createNativeWindow()
+    const protocol = createProtocol({ platform: "ios", version: "9.6", window: browserWindow })
+    const pending = protocol.request({ method: ["web_app_open_invoice", { slug: "wanted" }] })
+
+    emit("invoice_closed", { slug: "other", status: "paid" })
+    emit("invoice_closed", { slug: "wanted", status: "cancelled" })
+
+    expect(await pending).toEqual({
+      event: "invoice_closed",
+      payload: { slug: "wanted", status: "cancelled" },
     })
     protocol.destroy()
   })
@@ -386,7 +454,6 @@ describe("createProtocol request", () => {
       message: 'Request "web_app_request_write_access" was aborted',
       name: "AbortError",
     })
-    await Promise.resolve()
 
     emit("write_access_requested", { status: "allowed" })
     expect(await second).toEqual({
