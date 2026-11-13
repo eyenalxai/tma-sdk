@@ -271,6 +271,7 @@ describe("createSession", () => {
       expect(session.status.get()).toBe("launched")
       expect(environment.posts.map((post) => post.eventType)).toEqual([
         "web_app_request_theme",
+        "web_app_setup_back_button",
         "web_app_request_viewport",
       ])
 
@@ -284,6 +285,7 @@ describe("createSession", () => {
       expect(session.status.get()).toBe("mounted")
       expect(environment.posts.map((post) => post.eventType)).toEqual([
         "web_app_request_theme",
+        "web_app_setup_back_button",
         "web_app_request_viewport",
         "web_app_request_safe_area",
         "web_app_request_content_safe_area",
@@ -348,6 +350,36 @@ describe("createSession", () => {
 
       expect(session.status.get()).toBe("ready")
       expect(countPosts(environment.posts, "web_app_ready")).toBe(1)
+      session.destroy()
+    } finally {
+      environment.restore()
+    }
+  })
+
+  it("reconciles native chrome when the session starts", async () => {
+    const environment = installFakeWindow(launchWithoutInitData)
+    try {
+      const session = createSession()
+      const started = session.start()
+      await flushMicrotasks()
+
+      const backButtonPost = environment.posts.find(
+        (post) => post.eventType === "web_app_setup_back_button",
+      )
+      expect(backButtonPost?.eventData).toBe('{"is_visible":false}')
+
+      environment.emit("viewport_changed", {
+        height: 640,
+        is_state_stable: true,
+        is_expanded: true,
+      })
+      await started
+
+      const entering = session.features.viewport.requestFullscreen()
+      environment.emit("fullscreen_failed", { error: "ALREADY_FULLSCREEN" })
+      await entering
+
+      expect(session.features.viewport.store.get().isFullscreen).toBe(true)
       session.destroy()
     } finally {
       environment.restore()

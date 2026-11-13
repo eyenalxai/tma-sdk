@@ -12,6 +12,7 @@ type BackButtonState = {
 type BackButton = {
   isSupported: boolean
   store: Store<BackButtonState>
+  sync: () => void
   show: () => void
   hide: () => void
   onClick: (listener: () => void) => () => void
@@ -22,8 +23,8 @@ const createBackButton = (runtime: TelegramRuntime): BackButton => {
   const isSupported = protocol.mayInvoke("web_app_setup_back_button")
   const store = createStore<BackButtonState>({ isVisible: false })
 
-  const setVisible = (isVisible: boolean) => {
-    if (!isSupported || store.get().isVisible === isVisible) {
+  const postVisibility = (isVisible: boolean) => {
+    if (!isSupported) {
       return
     }
     if (invokeBestEffort(protocol, "web_app_setup_back_button", { is_visible: isVisible })) {
@@ -31,9 +32,20 @@ const createBackButton = (runtime: TelegramRuntime): BackButton => {
     }
   }
 
+  const setVisible = (isVisible: boolean) => {
+    if (store.get().isVisible === isVisible) {
+      return
+    }
+    postVisibility(isVisible)
+  }
+
   return {
     isSupported,
     store,
+    // A native reload keeps its own back-button state, so sync reconciles it.
+    sync: () => {
+      postVisibility(store.get().isVisible)
+    },
     show: () => {
       setVisible(true)
     },

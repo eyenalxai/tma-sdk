@@ -62,7 +62,11 @@ const safeAreaInsetsSchema = z.looseObject({
   right: z.number(),
 })
 
+// Some clients report only the edges that changed.
+const partialSafeAreaInsetsSchema = safeAreaInsetsSchema.partial()
+
 type SafeAreaInsets = z.output<typeof safeAreaInsetsSchema>
+type PartialSafeAreaInsets = z.output<typeof partialSafeAreaInsetsSchema>
 
 const viewportChangedEventSchema = z.looseObject({
   height: z.number(),
@@ -273,7 +277,7 @@ const eventTable = {
   },
   clipboard_text_received: { schema: clipboardTextReceivedEventSchema, since: "6.4" },
   content_safe_area_changed: {
-    schema: safeAreaInsetsSchema,
+    schema: partialSafeAreaInsetsSchema,
     since: "8.0",
     platforms: { macos: "unsupported" },
   },
@@ -385,7 +389,7 @@ const eventTable = {
   requested_chat_failed: { schema: requestedChatFailedEventSchema, since: "9.6" },
   requested_chat_sent: { schema: requestedChatSentEventSchema, since: "9.6" },
   safe_area_changed: {
-    schema: safeAreaInsetsSchema,
+    schema: partialSafeAreaInsetsSchema,
     since: "8.0",
     platforms: { webk: "unsupported" },
   },
@@ -943,5 +947,6 @@ export {
   type MethodParams,
   type OpenLinkBrowser,
   type Platform,
+  type PartialSafeAreaInsets,
   type SafeAreaInsets,
 }

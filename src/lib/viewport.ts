@@ -1,4 +1,4 @@
-import type { SafeAreaInsets } from "#lib/protocol/methods"
+import type { PartialSafeAreaInsets, SafeAreaInsets } from "#lib/protocol/methods"
 
 import { invokeBestEffort } from "#lib/protocol/client"
 
@@ -30,6 +30,15 @@ type Viewport = {
 }
 
 const zeroInsets: SafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 }
+
+const mergeInsets = (current: SafeAreaInsets, partial: PartialSafeAreaInsets): SafeAreaInsets => {
+  return {
+    top: partial.top ?? current.top,
+    bottom: partial.bottom ?? current.bottom,
+    left: partial.left ?? current.left,
+    right: partial.right ?? current.right,
+  }
+}
 
 const initialViewportState: ViewportState = {
   height: 0,
@@ -79,12 +88,14 @@ const createViewport = (
     )
     runtime.disposer.add(
       protocol.on("safe_area_changed", (insets) => {
-        store.update({ safeAreaInsets: insets })
+        store.update({ safeAreaInsets: mergeInsets(store.get().safeAreaInsets, insets) })
       }),
     )
     runtime.disposer.add(
       protocol.on("content_safe_area_changed", (insets) => {
-        store.update({ contentSafeAreaInsets: insets })
+        store.update({
+          contentSafeAreaInsets: mergeInsets(store.get().contentSafeAreaInsets, insets),
+        })
       }),
     )
 
@@ -128,8 +139,9 @@ const createViewport = (
     })
 
     if (result.event === "fullscreen_failed") {
-      if (fullscreen && result.payload.error === "ALREADY_FULLSCREEN") {
-        store.update({ isFullscreen: true })
+      // The requested state is already the native state, so the transition succeeded.
+      if (result.payload.error === "ALREADY_FULLSCREEN") {
+        store.update({ isFullscreen: fullscreen })
         return
       }
       throw new Error(`Fullscreen request failed: ${result.payload.error}`)

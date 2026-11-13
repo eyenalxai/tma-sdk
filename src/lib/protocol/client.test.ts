@@ -547,7 +547,7 @@ describe("createProtocol on", () => {
       received.push(payload)
     })
 
-    emit("content_safe_area_changed", { top: 1 })
+    emit("content_safe_area_changed", { top: "one" })
 
     expect(received).toEqual([])
     expect(error).toHaveBeenCalledTimes(1)
@@ -581,7 +581,7 @@ describe("createProtocol on", () => {
       received.push("second")
     })
 
-    emit("content_safe_area_changed", { top: 1 })
+    emit("content_safe_area_changed", { top: "one" })
 
     expect(error).toHaveBeenCalledTimes(1)
     expect(received).toEqual([])

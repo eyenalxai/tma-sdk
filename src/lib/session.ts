@@ -149,6 +149,7 @@ const createSession = (): Session => {
       if (protocol.mayInvoke("web_app_request_theme")) {
         invokeBestEffort(protocol, "web_app_request_theme")
       }
+      features.backButton.sync()
       await features.viewport.mount()
       if (isDestroyed) {
         return
